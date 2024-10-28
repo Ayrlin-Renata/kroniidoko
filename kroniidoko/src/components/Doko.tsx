@@ -1,30 +1,12 @@
 import { Component } from "preact";
-import { lastStreamDate, timeSince, isLive } from "../utils";
+import { lastStreamDate, isLive } from "../utils";
+import TimeSinceKronii from "./TimeSinceKronii";
 
 const live = await isLive();
 const krdate: Date = await lastStreamDate();
 const krdatetimestr = `${krdate.toLocaleDateString()} ${krdate.toLocaleTimeString()}`
 
 export default class Doko extends Component {
-
-    constructor() {
-        super();
-        this.state = { time: Date.now() };
-    }
-
-    // Called whenever our component is created
-    componentDidMount() {
-        // update time every second
-        this.timer = setInterval(() => {
-            this.setState({ time: Date.now() });
-        }, 1000);
-    }
-
-    // Called just before our component will be destroyed
-    componentWillUnmount() {
-        // stop when not renderable
-        clearInterval(this.timer);
-    }
 
     render() {
         if (live) {
@@ -39,7 +21,7 @@ export default class Doko extends Component {
                 <h3>NO KRONIIUM SINCE</h3>
                 <h2>{krdatetimestr}</h2>
                 <h3>WHICH IS ABOUT</h3>
-                <h2>{timeSince(krdate)}</h2>
+                <TimeSinceKronii krdate={krdate}/>
                 <h3>AGO</h3>
             </>
         );
