@@ -7,20 +7,17 @@ export default class TimeSinceKronii extends Component<{ krdate:Date }> {
         this.state = { time: Date.now() };
     }
 
-    // Called whenever our component is created
     componentDidMount() {
-        // update time every second
+        //@ts-ignore
         this.timer = setInterval(() => {
             this.setState({ time: Date.now() });
         }, 1000);
     }
 
-    // Called just before our component will be destroyed
     componentWillUnmount() {
-        // stop when not renderable
+        //@ts-ignore   
         clearInterval(this.timer);
     }
-
 
     render() {
 

@@ -9,7 +9,9 @@ export async function isLive() {
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
         limit: 1,
+        //@ts-ignore
         type: VideoType.Stream,
+        //@ts-ignore
         status: VideoStatus.Live,
     });
 
@@ -17,12 +19,13 @@ export async function isLive() {
 }
 
 export async function lastStreamDate() {
-    
     const videos = await client.getVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
         limit: 1,
+        //@ts-ignore
         type: VideoType.Stream,
+        //@ts-ignore
         status: VideoStatus.Past,
     });
     return videos[0].availableAt;
