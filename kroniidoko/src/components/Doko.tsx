@@ -13,7 +13,8 @@ export default class Doko extends Component {
                 live: Boolean,
                 krlastdate: Date,
                 krnexttitle: String,
-                krnextdate: Date
+                krnextdate: Date,
+                krnextid: String
             }
         }
     }
@@ -25,7 +26,8 @@ export default class Doko extends Component {
                 live: res.live,
                 krlastdate: res.krlastdate,
                 krnexttitle: res.krnexttitle,
-                krnextdate: res.krnextdate
+                krnextdate: res.krnextdate,
+                krnextid: res.krnextid
             }
         }));
     }
@@ -60,14 +62,14 @@ export default class Doko extends Component {
                         (
                             <>
                                 <h3 class="serif">NEXT STREAM:</h3>
-                                <h2>{data.krnexttitle}</h2>
+                                <h2><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h2>
                                 <h2>{data.krnextdate}</h2>
                             </>
                         ) : (
                             <>
                                 <br/>
                                 <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
-                                <p class="lowtext">according to holodex</p>
+                                <p class="lowtext">according to the holodex API...</p>
                             </>
                         )
                 }

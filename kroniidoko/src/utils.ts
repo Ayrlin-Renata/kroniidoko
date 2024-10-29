@@ -6,16 +6,18 @@ const client = new HolodexApiClient({
 
 export async function getKrData() {
     //@ts-ignore
+    const krlastvideo = await getPastStream(VideoStatus);
+    //@ts-ignore
     const krnextvideo = await getStream(VideoStatus.Upcoming);
-    console.log(krnextvideo)
 
     return {
         live: await isLive(),
         //@ts-ignore
-        krlastdate: (await getStream(VideoStatus.Past)).availableAt,
+        krlastdate: krlastvideo.actualEnd || krlastvideo.availableAt,
         krnext: !!krnextvideo,
         krnexttitle: krnextvideo.title || "",
-        krnextdate: krnextvideo.availableAt,
+        krnextdate: krnextvideo.scheduledStart || krnextvideo.availableAt,
+        krnextid: krnextvideo.videoId
     }
 }
 
@@ -25,8 +27,21 @@ async function isLive() {
     return !(!Array.isArray(videos) || !videos.length);
 }
 
-async function getStream(when: VideoStatus) {
+async function getPastStream() {
     const videos = await client.getVideos({
+        channel_id: import.meta.env.VITE_CHANNEL_ID,
+        include: "live_info",
+        limit: 1,
+        //@ts-ignore
+        type: VideoType.Stream,
+        //@ts-ignore
+        status: VideoStatus.Past,
+    });
+    return videos[0];
+}
+
+async function getStream(when: VideoStatus) {
+    const videos = await client.getLiveVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
         limit: 1,
@@ -34,6 +49,7 @@ async function getStream(when: VideoStatus) {
         type: VideoType.Stream,
         status: when,
     });
+    if(when == VideoStatus.Upcoming) { console.log(videos)}
     return videos[0];
 }
 
