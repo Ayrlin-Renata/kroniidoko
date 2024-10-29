@@ -8,10 +8,18 @@ export async function getKrData() {
     //@ts-ignore
     const krlastvideo = await getPastStream(VideoStatus);
     //@ts-ignore
-    const krnextvideo = await getStream(VideoStatus.Upcoming);
+    let krnextvideo;
+    const live = await isLive();
+    if(live) {
+        //@ts-ignore
+        krnextvideo = await getStream(VideoStatus.Live);
+    } else {
+        //@ts-ignore
+        krnextvideo = await getStream(VideoStatus.Upcoming);
+    }
 
     return {
-        live: await isLive(),
+        live: live,
         //@ts-ignore
         krlastdate: krlastvideo.actualEnd || krlastvideo.availableAt,
         krnext: !!krnextvideo,
@@ -23,8 +31,10 @@ export async function getKrData() {
 
 async function isLive() {
     //@ts-ignore
-    const videos = getStream(VideoStatus.Live)
-    return !(!Array.isArray(videos) || !videos.length);
+    const video = getStream(VideoStatus.Live)
+    return !!video;
+    // console.log(videos)
+    // return !(!Array.isArray(videos) || !videos.length);
 }
 
 async function getPastStream() {

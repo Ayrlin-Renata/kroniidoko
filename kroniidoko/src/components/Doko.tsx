@@ -51,6 +51,7 @@ export default class Doko extends Component {
             return (
                 <>
                     <h2 class="serif">KRONII KOKO!!!</h2>
+                    <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
                 </>
             );
         }
