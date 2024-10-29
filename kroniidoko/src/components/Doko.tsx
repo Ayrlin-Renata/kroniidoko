@@ -41,17 +41,17 @@ export default class Doko extends Component {
         if (data.live) {
             return (
                 <>
-                    <h3>KRONII KOKO</h3>
+                    <h2 class="serif">KRONII KOKO!!!</h2>
                 </>
             );
         }
         return (
             <>
-                <h3>NO KRONIIUM SINCE</h3>
+                <h3 class="serif">NO KRONIIUM SINCE</h3>
                 <h2>{krdatetimestr}</h2>
-                <h3>WHICH IS ABOUT</h3>
+                <h3 class="serif">WHICH IS ABOUT</h3>
                 <TimeSinceKronii krdate={data.krdate} />
-                <h3>AGO</h3>
+                <h3 class="serif">AGO</h3>
             </>
         );
     }
