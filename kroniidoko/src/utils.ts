@@ -68,5 +68,5 @@ export function timeSince(date: Date) {
         seconds -= Math.floor(interval) * 60;
     }
     const secs = Math.floor(seconds);
-    return outstr + (outstr? "and " : "") + secs + (secs > 1? " seconds" : " second");
+    return outstr + (outstr? "and " : "") + secs + ((secs == 0 || secs > 1)? " seconds" : " second");
 }
