@@ -4,7 +4,14 @@ const client = new HolodexApiClient({
     apiKey: import.meta.env.VITE_HOLODEX_API_KEY
 });
 
-export async function isLive() {
+export async function getKrData() {
+    return {
+        live: await isLive(),
+        krdate: await lastStreamDate()
+    }
+}
+
+async function isLive() {
     const videos = await client.getVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
@@ -18,7 +25,7 @@ export async function isLive() {
     return !(!Array.isArray(videos) || !videos.length);
 }
 
-export async function lastStreamDate() {
+async function lastStreamDate() {
     const videos = await client.getVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
