@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "http://kroniidoko.ayrl.in/",
+  "homepage": "https://kroniidoko.ayrl.in/",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
