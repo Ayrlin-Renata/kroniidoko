@@ -5,37 +5,36 @@ const client = new HolodexApiClient({
 });
 
 export async function getKrData() {
+    //@ts-ignore
+    const krnextvideo = await getStream(VideoStatus.Upcoming);
+    console.log(krnextvideo)
+
     return {
         live: await isLive(),
-        krdate: await lastStreamDate()
+        //@ts-ignore
+        krlastdate: (await getStream(VideoStatus.Past)).availableAt,
+        krnext: !!krnextvideo,
+        krnexttitle: krnextvideo.title || "",
+        krnextdate: krnextvideo.availableAt,
     }
 }
 
 async function isLive() {
-    const videos = await client.getVideos({
-        channel_id: import.meta.env.VITE_CHANNEL_ID,
-        include: "live_info",
-        limit: 1,
-        //@ts-ignore
-        type: VideoType.Stream,
-        //@ts-ignore
-        status: VideoStatus.Live,
-    });
-
+    //@ts-ignore
+    const videos = getStream(VideoStatus.Live)
     return !(!Array.isArray(videos) || !videos.length);
 }
 
-async function lastStreamDate() {
+async function getStream(when: VideoStatus) {
     const videos = await client.getVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
         limit: 1,
         //@ts-ignore
         type: VideoType.Stream,
-        //@ts-ignore
-        status: VideoStatus.Past,
+        status: when,
     });
-    return videos[0].availableAt;
+    return videos[0];
 }
 
 export function timeSince(date: Date) {
