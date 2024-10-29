@@ -12,6 +12,7 @@ export default class Doko extends Component {
             data: {
                 live: Boolean,
                 krlastdate: Date,
+                krnext: Boolean,
                 krnexttitle: String,
                 krnextdate: Date,
                 krnextid: String
@@ -25,6 +26,7 @@ export default class Doko extends Component {
             data: {
                 live: res.live,
                 krlastdate: res.krlastdate,
+                krnext: res.krnext,
                 krnexttitle: res.krnexttitle,
                 krnextdate: res.krnextdate,
                 krnextid: res.krnextid
@@ -42,7 +44,8 @@ export default class Doko extends Component {
                 </>
             );
         }
-        const krdatetimestr = `${data.krlastdate.toLocaleDateString()} ${data.krlastdate.toLocaleTimeString()}`
+        const krlastdatetimestr = `${data.krlastdate.toLocaleDateString()} ${data.krlastdate.toLocaleTimeString()}`
+        const krnextdatetimestr = `${data.krnextdate.toLocaleDateString()} ${data.krnextdate.toLocaleTimeString()}`
 
         if (data.live) {
             return (
@@ -54,16 +57,18 @@ export default class Doko extends Component {
         return (
             <>
                 <h3 class="serif">NO KRONIIUM SINCE</h3>
-                <h2>{krdatetimestr}</h2>
+                <h2>{krlastdatetimestr}</h2>
+                <br/>
                 <h3 class="serif">THE WARDEN HAS BEEN AWAY FOR</h3>
                 <TimeSinceKronii krdate={data.krlastdate} />
+                <br/>
                 {
                     (data.krnext) ?
                         (
                             <>
-                                <h3 class="serif">NEXT STREAM:</h3>
-                                <h2><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h2>
-                                <h2>{data.krnextdate}</h2>
+                                <h3 class="serif">NEXT SCHEDULED STREAM</h3>
+                                <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
+                                <h3>{"at " + krnextdatetimestr}</h3>
                             </>
                         ) : (
                             <>

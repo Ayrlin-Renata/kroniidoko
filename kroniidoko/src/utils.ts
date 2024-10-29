@@ -44,12 +44,12 @@ async function getStream(when: VideoStatus) {
     const videos = await client.getLiveVideos({
         channel_id: import.meta.env.VITE_CHANNEL_ID,
         include: "live_info",
-        limit: 1,
+        limit: 10,
         //@ts-ignore
         type: VideoType.Stream,
         status: when,
     });
-    if(when == VideoStatus.Upcoming) { console.log(videos)}
+    //if(when == VideoStatus.Upcoming) { console.log(videos)}
     return videos[0];
 }
 
