@@ -31,10 +31,8 @@ export async function getKrData() {
 
 async function isLive() {
     //@ts-ignore
-    const video = getStream(VideoStatus.Live)
+    const video = await getStream(VideoStatus.Live)
     return !!video;
-    // console.log(videos)
-    // return !(!Array.isArray(videos) || !videos.length);
 }
 
 async function getPastStream() {
