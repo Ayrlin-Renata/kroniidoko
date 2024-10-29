@@ -10,5 +10,12 @@
 }
 
 .lowtext {
-  color: rgba(130,130,130,0.85);
+  color: rgba(130, 130, 130, 0.85);
+}
+
+#logo {
+  display: block;
+  width: 80%;
+  margin: 0;
+  padding-left: 20%;
 }
