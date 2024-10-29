@@ -35,12 +35,15 @@ h1 {
   line-height: 1.1;
 }
 h2 {
+  margin-top: 0.5em;
   font-size: 3em;
-  line-height: 1.1;
+  line-height: 1.0;
 }
 h3 {
+  padding-top: 1em;
+  margin-bottom: 0;
   font-size: 1.5em;
-  line-height: 1.1;
+  line-height: 1.0;
 }
 
 button {

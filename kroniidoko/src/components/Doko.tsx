@@ -36,7 +36,7 @@ export default class Doko extends Component {
         if (loading) {
             return (
                 <>
-                    <h3>loading...</h3>
+                    <h3>asking holodex nicely...</h3>
                 </>
             );
         }
@@ -53,9 +53,8 @@ export default class Doko extends Component {
             <>
                 <h3 class="serif">NO KRONIIUM SINCE</h3>
                 <h2>{krdatetimestr}</h2>
-                <h3 class="serif">WHICH IS ABOUT</h3>
+                <h3 class="serif">THE WARDEN HAS BEEN AWAY FOR</h3>
                 <TimeSinceKronii krdate={data.krlastdate} />
-                <h3 class="serif">AGO</h3>
                 {
                     (data.krnext) ?
                         (
@@ -68,6 +67,7 @@ export default class Doko extends Component {
                             <>
                                 <br/>
                                 <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
+                                <p class="lowtext">according to holodex</p>
                             </>
                         )
                 }
