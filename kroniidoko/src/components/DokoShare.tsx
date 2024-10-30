@@ -26,6 +26,7 @@ export default class DokoShare extends Component<DSProps, DSState> {
 
     prepDlg: any;
     shareDlg: any;
+    shareQuote: any;
     render() {
         // console.log("render")
         // console.log(this.state)
@@ -58,7 +59,7 @@ export default class DokoShare extends Component<DSProps, DSState> {
                             <img id="sharepfp" src={this.state.fileData} />
                             <h1 id="sharename" class="serif">{this.state.name}</h1>
                             {(this.state.quote)? 
-                            (<p id="sharequote">{this.state.quote}</p>) : (<></>)}
+                            (<p id="sharequote" ref={shareQuote => { this.shareQuote = shareQuote; }}>{this.state.quote}</p>) : (<></>)}
                             <br/>
                         </div>
                         <div>
@@ -77,13 +78,6 @@ export default class DokoShare extends Component<DSProps, DSState> {
     }
 
     handleImageChange = (event: any) => {
-        // if (FileReader) {
-        //     let fr: FileReader = new FileReader();
-        //     fr.onload = () => {
-        //         this.setState({ fileData: fr.result?.toString() });
-        //     }
-        //     fr.readAsDataURL(event.target.files[0]);
-        // }
         this.setState({ fileData: URL.createObjectURL(event.target.files[0]) });
     }
 
@@ -96,8 +90,11 @@ export default class DokoShare extends Component<DSProps, DSState> {
     }
 
     handlePrepSubmit = () => {
-        //console.log("ACCEPT");
-        //console.log(this.state);
+        if(this.state.quote.length <= 150) {
+            this.shareQuote.classList.add('beeg');
+        } else {
+            this.shareQuote.classList.remove('beeg');
+        }
         this.shareDlg.MDComponent.show();
     }
 
