@@ -2,20 +2,33 @@ import { Component } from "preact";
 import { getKrData } from "../utils";
 import TimeSinceKronii from "./TimeSinceKronii";
 
-
-export default class Doko extends Component {
+type DParams = {
+    next: Boolean
+}
+type DState = {
+    loading: Boolean,
+    data: {
+        live: Boolean,
+        krlastdate: Date,
+        krnext: Boolean,
+        krnexttitle: String,
+        krnextdate: Date,
+        krnextid: String
+    }
+}
+export default class Doko extends Component<DParams, DState> {
 
     constructor() {
         super()
         this.state = {
-            loading: Boolean,
+            loading: true,
             data: {
-                live: Boolean,
-                krlastdate: Date,
-                krnext: Boolean,
-                krnexttitle: String,
-                krnextdate: Date,
-                krnextid: String
+                live: false,
+                krlastdate: new Date(),
+                krnext: false,
+                krnexttitle: "",
+                krnextdate: new Date(),
+                krnextid: ""
             }
         }
     }
@@ -34,8 +47,7 @@ export default class Doko extends Component {
         }));
     }
 
-    render() {
-        //@ts-ignore
+    render(params: DParams) {
         const { loading, data } = this.state;
         if (loading) {
             return (
@@ -59,25 +71,27 @@ export default class Doko extends Component {
             <>
                 <h3 class="serif">NO KRONIIUM SINCE</h3>
                 <h2>{krlastdatetimestr}</h2>
-                <br/>
+                <br />
                 <h3 class="serif">THE WARDEN HAS BEEN AWAY FOR</h3>
                 <TimeSinceKronii krdate={data.krlastdate} />
-                <br/>
+                <br />
                 {
-                    (data.krnext) ?
-                        (
-                            <>
-                                <h3 class="serif">NEXT SCHEDULED STREAM</h3>
-                                <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
-                                <h3>{"at " + krnextdatetimestr}</h3>
-                            </>
-                        ) : (
-                            <>
-                                <br/>
-                                <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
-                                <p class="lowtext">according to the holodex API...</p>
-                            </>
-                        )
+                    (params.next) ?
+                        (data.krnext) ?
+                            (
+                                <>
+                                    <h3 class="serif">NEXT SCHEDULED STREAM</h3>
+                                    <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
+                                    <h3>{"at " + krnextdatetimestr}</h3>
+                                </>
+                            ) : (
+                                <>
+                                    <br />
+                                    <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
+                                    <p class="lowtext">according to the holodex API...</p>
+                                </>
+                            )
+                        : (<></>)
                 }
             </>
         );
