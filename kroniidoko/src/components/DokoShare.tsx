@@ -4,7 +4,7 @@ import 'preact-material-components/Button/style.css';
 import 'preact-material-components/Dialog/style.css';
 import { Component } from 'preact';
 import Doko from './Doko';
-import '/src/assets/kronii.png'
+import KroniiImg from '/src/assets/kronii.png';
 
 type DSProps = {}
 type DSState = {
@@ -63,7 +63,7 @@ export default class DokoShare extends Component<DSProps, DSState> {
                             <Doko next={false}/>
                             <p class="lowtext">kroniidoko.ayrl.in</p>
                         </div>
-                        <img id="sharebg" src="/src/assets/kronii.png"/>
+                        <img id="sharebg" src={KroniiImg}/>
                     </Dialog.Body>
                     <Dialog.Footer>
                         <Dialog.FooterButton onClick={this.handleSharePress}>Share Website</Dialog.FooterButton>
