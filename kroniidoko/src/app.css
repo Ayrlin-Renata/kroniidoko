@@ -16,8 +16,9 @@ button.mdc-button.mdc-button--raised {
   border-radius: 7px !important;
 }
 
-dialog.mdc-dialog.mdc-dialog--open {
+dialog.mdc-dialog {
   background-color: rgba(0,0,10,0.50) !important;
+  border:none;
 }
 
 div.mdc-dialog__surface {
