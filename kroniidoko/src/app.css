@@ -41,6 +41,7 @@ div.mdc-dialog__surface > * {
   width: 70%;
   margin: 0 auto;
 }
+
 .mdc-dialog__body > div > * {
   box-sizing:border-box;
 }

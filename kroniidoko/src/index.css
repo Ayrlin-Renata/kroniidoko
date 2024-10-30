@@ -96,5 +96,9 @@ button:focus-visible {
   div.mdc-dialog__surface {
     position: absolute;
     left: 0;
+    top: 0;
+  }
+  .mdc-dialog__body > div {
+    width: 95% !important;
   }
 }
