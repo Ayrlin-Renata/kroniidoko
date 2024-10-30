@@ -5,6 +5,7 @@ import 'preact-material-components/Dialog/style.css';
 import { Component } from 'preact';
 import Doko from './Doko';
 import KroniiImg from '/src/assets/kronii.png';
+import Hourglass from '/src/assets/hourglass-not-done.png';
 
 type DSProps = {}
 type DSState = {
@@ -17,7 +18,7 @@ export default class DokoShare extends Component<DSProps, DSState> {
     constructor() {
         super();
         this.state = {
-            fileData: "",
+            fileData: Hourglass,
             name: "",
             quote: ""
         };
@@ -56,7 +57,8 @@ export default class DokoShare extends Component<DSProps, DSState> {
                         <div>
                             <img id="sharepfp" src={this.state.fileData} />
                             <h1 id="sharename" class="serif">{this.state.name}</h1>
-                            <p id="sharequote">{this.state.quote}</p>
+                            {(this.state.quote)? 
+                            (<p id="sharequote">{this.state.quote}</p>) : (<></>)}
                             <br/>
                         </div>
                         <div>

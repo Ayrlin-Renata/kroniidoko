@@ -14,7 +14,9 @@ export function App() {
       </div>
       <br/>
       <br/>
+      <br/>
       <DokoShare/>
+      <br/>
       <br/>
       <br/>
       <p>a fan site for <a href="https://www.youtube.com/@OuroKronii">Ouro Kronii</a> of hololive English -Promise-</p>

@@ -69,11 +69,10 @@ export default class Doko extends Component<DParams, DState> {
         }
         return (
             <>
-                <h3 class="serif">NO KRONIIUM SINCE</h3>
-                <h2>{krlastdatetimestr}</h2>
-                <br />
                 <h3 class="serif">THE WARDEN HAS BEEN AWAY FOR</h3>
                 <TimeSinceKronii krdate={data.krlastdate} />
+                <h3 class="serif">NO KRONIIUM SINCE</h3>
+                <h2>{krlastdatetimestr}</h2>
                 <br />
                 {
                     (params.next) ?
