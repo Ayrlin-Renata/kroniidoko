@@ -90,10 +90,12 @@ export default class DokoShare extends Component<DSProps, DSState> {
     }
 
     handlePrepSubmit = () => {
-        if(this.state.quote.length <= 150) {
-            this.shareQuote.classList.add('beeg');
-        } else {
-            this.shareQuote.classList.remove('beeg');
+        if(this.shareQuote) {
+            if(this.state.quote.length <= 150) {
+                this.shareQuote.classList.add('beeg');
+            } else {
+                this.shareQuote.classList.remove('beeg');
+            }
         }
         this.shareDlg.MDComponent.show();
     }
