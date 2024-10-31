@@ -18,9 +18,19 @@ export async function getKrData() {
         krnextvideo = await getStream(VideoStatus.Upcoming);
     }
 
+    let krnext = !!krnextvideo; 
+    if (!krnext) {
+        return {
+            live: live,
+            krlastdate: krlastvideo.actualEnd || krlastvideo.availableAt,
+            krnext: krnext,
+            krnexttitle: "",
+            krnextdate: new Date(),
+            krnextid: ""
+        }
+    } 
     return {
         live: live,
-        //@ts-ignore
         krlastdate: krlastvideo.actualEnd || krlastvideo.availableAt,
         krnext: !!krnextvideo,
         krnexttitle: krnextvideo.title || "",
