@@ -6,19 +6,21 @@ import DokoShare from './components/DokoShare'
 export function App() {
   return (
     <>
-      <Logo id="logo" color="#ddd"/>
-      <h1 class="serif">kronii doko?</h1>
-      <br/>
-      <div class="card">
-        <Doko next={true}/>
+      <div id="topbar">
+        <Logo id="logo" color="#ddd" />
+        <h1 id="titleheading" class="serif">kronii doko?</h1>
       </div>
-      <br/>
-      <br/>
-      <br/>
-      <DokoShare/>
-      <br/>
-      <br/>
-      <br/>
+      <br />
+      <div class="card">
+        <Doko next={true} />
+      </div>
+      <br />
+      <br />
+      <br />
+      <DokoShare />
+      <br />
+      <br />
+      <br />
       <p>a fan site for <a href="https://www.youtube.com/@OuroKronii">Ouro Kronii</a> of hololive English -Promise-</p>
       <p class="lowtext">powered by holodex.js and the holodex API</p>
       <p class="lowtext">images and intellectual property owned by COVER Corporation, and used under COVER Corp.'s <a href="https://hololivepro.com/en/terms/">derivative works guidelines.</a></p>
