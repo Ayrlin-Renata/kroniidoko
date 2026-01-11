@@ -99,10 +99,10 @@ export default class Doko extends Component<DParams, DState> {
                                     <h3>{"at " + krnextdatetimestr}</h3>
                                 </>
                             ) : (
-                                <>
+                                <div class="no-stream-msg">
                                     <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
                                     <p class="lowtext">according to the holodex API...</p>
-                                </>
+                                </div>
                             )
                         : (<></>)
                 }

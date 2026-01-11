@@ -209,4 +209,9 @@ input {
     padding: 0 !important;
     padding-top: 5px !important;
   }
+
+  /* Hide empty stream message in compact mode */
+  .no-stream-msg {
+    display: none !important;
+  }
 }
