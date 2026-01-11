@@ -121,8 +121,8 @@ export default class Forecast extends Component<{}, ForecastState> {
             const t = new Date(current.getTime() + i * 3600 * 1000);
             times.push(t);
 
-            const hour = t.getHours();
-            const dow = t.getDay();
+            const hour = t.getUTCHours();
+            const dow = t.getUTCDay();
 
             const hour_sin = Math.sin(2 * Math.PI * hour / 24);
             const hour_cos = Math.cos(2 * Math.PI * hour / 24);
@@ -180,17 +180,29 @@ export default class Forecast extends Component<{}, ForecastState> {
                 timeZone: timezone
             });
 
+            const hourInTzStr = new Intl.DateTimeFormat('en-US', {
+                hour: 'numeric',
+                hourCycle: 'h23',
+                timeZone: timezone
+            }).format(t);
+            const hourInTz = parseInt(hourInTzStr);
+
+
             if (!daysMap[dayName]) {
                 uniqueDayNames.push(dayName);
                 daysMap[dayName] = {
                     name: dayName,
-                    probs: [],
+                    probs: new Array(24).fill(0),
                     maxProb: 0,
                     highProbCount: 0
                 };
             }
             const p = probs[i];
-            daysMap[dayName].probs.push(p);
+
+            if (daysMap[dayName].probs[hourInTz] !== undefined) {
+                daysMap[dayName].probs[hourInTz] = p;
+            }
+
             if (p > daysMap[dayName].maxProb) daysMap[dayName].maxProb = p;
             if (p >= MODEL_THRESHOLD) daysMap[dayName].highProbCount++;
         });
@@ -200,10 +212,9 @@ export default class Forecast extends Component<{}, ForecastState> {
         this.setState({ days: finalDays });
     }
 
-    renderSparkline(probs: number[]) {
+    renderSparkline(probs: number[], nowX: number | null = null) {
         const points = probs.map((p, i) => {
-            const div = probs.length > 1 ? (probs.length - 1) : 1;
-            const x = (i / div) * 100;
+            const x = (i / 23) * 100;
 
             const val = Math.max(0, Math.min(1, p));
             const y = 95 - (val * 90);
@@ -223,6 +234,16 @@ export default class Forecast extends Component<{}, ForecastState> {
                     vectorEffect="non-scaling-stroke"
                     style={{ vectorEffect: 'non-scaling-stroke' }}
                 />
+                {nowX !== null && (
+                    <line
+                        x1={nowX} y1="0"
+                        x2={nowX} y2="100"
+                        stroke="#00bfff" /* Deep Sky Blue */
+                        stroke-width="1.5"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ vectorEffect: 'non-scaling-stroke', opacity: 0.8 }}
+                    />
+                )}
             </svg>
         );
     }
@@ -235,6 +256,20 @@ export default class Forecast extends Component<{}, ForecastState> {
 
     render() {
         const { days, timezone } = this.state;
+
+        const now = new Date();
+        const todayName = now.toLocaleDateString('en-US', {
+            weekday: 'short',
+            day: 'numeric',
+            timeZone: timezone
+        });
+
+        const parts = new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: timezone
+        }).formatToParts(now);
+        const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+        const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+        const currentX = ((h + m / 60) / 23) * 100;
 
 
         return (
@@ -253,6 +288,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                 <div class="forecast-grid">
                     {days.map(day => {
                         const isActive = day.maxProb >= MODEL_THRESHOLD;
+                        const isToday = day.name === todayName;
                         return (
                             <div class={`day-card ${isActive ? 'active' : ''}`}>
                                 <span class="day-header">{day.name}</span>
@@ -261,7 +297,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                                 </span>
                                 <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
                                 <div class="sparkline-container">
-                                    {this.renderSparkline(day.probs)}
+                                    {this.renderSparkline(day.probs, isToday ? currentX : null)}
                                 </div>
                             </div>
                         );
