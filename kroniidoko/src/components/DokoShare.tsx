@@ -58,19 +58,19 @@ export default class DokoShare extends Component<DSProps, DSState> {
                         <div>
                             <img id="sharepfp" src={this.state.fileData} />
                             <h1 id="sharename" class="serif">{this.state.name}</h1>
-                            {(this.state.quote)? 
-                            (<p id="sharequote" ref={shareQuote => { this.shareQuote = shareQuote; }}>{this.state.quote}</p>) : (<></>)}
-                            <br/>
+                            {(this.state.quote) ?
+                                (<p id="sharequote" ref={shareQuote => { this.shareQuote = shareQuote; }}>{this.state.quote}</p>) : (<></>)}
+                            <br />
                         </div>
                         <div>
-                            <Doko next={false}/>
+                            <Doko next={false} hideForecast={true} />
                             <p class="lowtext">kroniidoko.ayrl.in</p>
                         </div>
-                        <img id="sharebg" src={KroniiImg}/>
+                        <img id="sharebg" src={KroniiImg} />
                     </Dialog.Body>
                     <Dialog.Footer>
-                        <Dialog.FooterButton onClick={this.handleSharePress}>Share Website</Dialog.FooterButton>
-                        <Dialog.FooterButton cancel={true}>Done</Dialog.FooterButton>
+                        <Dialog.FooterButton onClick={this.handleSharePress}>SHARE WEBSITE</Dialog.FooterButton>
+                        <Dialog.FooterButton cancel={true}>DONE</Dialog.FooterButton>
                     </Dialog.Footer>
                 </Dialog>
             </>
@@ -90,8 +90,8 @@ export default class DokoShare extends Component<DSProps, DSState> {
     }
 
     handlePrepSubmit = () => {
-        if(this.shareQuote) {
-            if(this.state.quote.length <= 150) {
+        if (this.shareQuote) {
+            if (this.state.quote.length <= 150) {
                 this.shareQuote.classList.add('beeg');
             } else {
                 this.shareQuote.classList.remove('beeg');

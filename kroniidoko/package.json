@@ -12,7 +12,9 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "holodex.js": "^2.0.5",
+    "onnxruntime-web": "^1.16.3",
     "preact": "^10.24.3",
     "preact-material-components": "^1.6.1"
   },

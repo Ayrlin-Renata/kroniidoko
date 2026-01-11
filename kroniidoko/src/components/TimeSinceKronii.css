@@ -1,0 +1,67 @@
+.time-since-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 40px 0;
+    /* Added spacing */
+}
+
+/* Common card style for information display */
+.info-card-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    /* Revert to Serif */
+    padding: 20px 40px;
+
+    /* Flat gradient similar to Forecast Cards */
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(32, 32, 53, 0.95));
+    border-radius: 12px;
+    /* box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); Removed per user request/edit earlier */
+
+    /* Ensure text color is correct */
+    color: #fff;
+    min-width: fit-content;
+}
+
+/* Transparent override for share overlay */
+.info-card-box.transparent {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 10px 0;
+    /* Reduce padding since no border box */
+}
+
+.time-unit {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100px;
+}
+
+.time-val {
+    font-size: 4rem;
+    margin-bottom: 0.3rem;
+    margin-top: -0.5rem;
+    font-weight: 100;
+    /* Lighter weight for serif elegance */
+    line-height: 1;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+
+.time-label {
+    font-size: 1.1rem;
+    color: #aaa;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: inherit;
+}
+
+/* For the single date display */
+.date-display {
+    font-size: 2rem;
+    font-weight: 100;
+}

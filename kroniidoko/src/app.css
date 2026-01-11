@@ -12,13 +12,14 @@ button.mdc-button {
 button.mdc-button.mdc-button--raised {
   padding: 1em 2.2em !important;
   font-size: 1.2em !important;
-  background-color: #446 !important;
+  background-color: #23274b !important;
+  color: #ddd !important;
   border-radius: 7px !important;
 }
 
 dialog.mdc-dialog {
-  background-color: rgba(0,0,10,0.50) !important;
-  border:none;
+  background-color: rgba(0, 0, 10, 0.50) !important;
+  border: none;
 }
 
 div.mdc-dialog__surface {
@@ -30,23 +31,23 @@ h2.mdc-dialog__header__title {
   font-family: Georgia, 'Times New Roman', Times, serif;
 }
 
-div.mdc-dialog__surface > * {
+div.mdc-dialog__surface>* {
   color: #eee !important;
   font-family: 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-.mdc-dialog__body > div {
-  position:relative;
+.mdc-dialog__body>div {
+  position: relative;
   z-index: 10;
   width: 70%;
   margin: 0 auto;
 }
 
-.mdc-dialog__body > div > * {
-  box-sizing:border-box;
+.mdc-dialog__body>div>* {
+  box-sizing: border-box;
 }
 
-.mdc-dialog__body > div > img {
+.mdc-dialog__body>div>img {
   object-fit: contain;
   width: 10em;
   border: solid 3px #eee;
@@ -122,11 +123,44 @@ input {
 }
 
 #sharebg {
-  position:fixed;
+  position: fixed;
   z-index: 1;
   top: 0;
   left: -30%;
   width: 100%;
   filter: contrast(0.7) brightness(0.34) saturate(0.8);
   mix-blend-mode: lighten;
+}
+
+/* Share Dialog Button Styles */
+.mdc-dialog__footer__button,
+.mdc-dialog__footer button {
+  background-color: #495494 !important;
+  /* Indigo primary */
+  color: white !important;
+  border-radius: 3px !important;
+  padding: 5px 20px !important;
+  text-transform: none !important;
+  font-family: Georgia, 'Times New Roman', Times, serif !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.5px !important;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.mdc-dialog__footer__button:hover,
+.mdc-dialog__footer button:hover {
+  background-color: #5c6bc0 !important;
+  transform: translateY(-1px);
+}
+
+.mdc-dialog__footer__button--cancel,
+.mdc-dialog__footer button.mdc-dialog__footer__button--cancel {
+  background-color: transparent !important;
+  color: #ddd !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.mdc-dialog__footer__button--cancel:hover,
+.mdc-dialog__footer button.mdc-dialog__footer__button--cancel:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
