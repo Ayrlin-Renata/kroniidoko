@@ -39,7 +39,7 @@ export default class DokoShare extends Component<DSProps, DSState> {
                     <Dialog.Header><h3>i miss kronii...</h3></Dialog.Header>
                     <Dialog.Body>
                         <div>
-                            <p>Upload a profile image:</p>
+                            <p>Upload a profile image (it isn't saved):</p>
                             <input type="file" onChange={this.handleImageChange}></input>
                             <p>Your name?</p>
                             <input onChange={this.handleNameChange}></input>
