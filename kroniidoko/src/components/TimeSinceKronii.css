@@ -2,35 +2,27 @@
     display: flex;
     justify-content: center;
     margin: 20px 0 40px 0;
-    /* Added spacing */
 }
 
-/* Common card style for information display */
 .info-card-box {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 2rem;
     font-family: Georgia, 'Times New Roman', Times, serif;
-    /* Revert to Serif */
     padding: 20px 40px;
 
-    /* Flat gradient similar to Forecast Cards */
     background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(32, 32, 53, 0.95));
     border-radius: 12px;
-    /* box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); Removed per user request/edit earlier */
 
-    /* Ensure text color is correct */
     color: #fff;
     min-width: fit-content;
 }
 
-/* Transparent override for share overlay */
 .info-card-box.transparent {
     background: transparent !important;
     box-shadow: none !important;
     padding: 10px 0;
-    /* Reduce padding since no border box */
 }
 
 .time-unit {
@@ -45,7 +37,6 @@
     margin-bottom: 0.3rem;
     margin-top: -0.5rem;
     font-weight: 100;
-    /* Lighter weight for serif elegance */
     line-height: 1;
     color: #fff;
     font-variant-numeric: tabular-nums;
@@ -60,27 +51,30 @@
     font-family: inherit;
 }
 
-/* For the single date display */
 .date-display {
     font-size: 2rem;
     font-weight: 100;
 }
 
-/* Responsive adjustments for small screens/tiles */
+#laststream {
+    margin-top: 2rem;
+    margin-bottom: 4rem;
+}
+
 @media (max-width: 600px) {
     .info-card-box {
         gap: 0.5rem;
-        padding: 15px 10px;
+        padding: 0px 5px;
+        background: transparent;
+        box-shadow: none;
     }
 
     .time-unit {
         width: 70px;
-        /* Shrink width */
     }
 
     .time-val {
-        font-size: 2.2rem;
-        /* Shrink font significantly */
+        font-size: 2.6rem;
         margin-bottom: 0px;
     }
 
@@ -89,10 +83,9 @@
     }
 
     .date-display {
-        font-size: 1.2rem;
+        font-size: 1.4rem;
     }
 
-    /* Even smaller screens (e.g. very small tiles) */
     @media (max-width: 350px) {
         .time-unit {
             width: auto;

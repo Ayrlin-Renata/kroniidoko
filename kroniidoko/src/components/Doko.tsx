@@ -74,22 +74,21 @@ export default class Doko extends Component<DParams, DState> {
         }
         return (
             <>
-                <div style={{ margin: "2rem 0" }}>
-                    <h3 class="serif" style={{ marginBottom: "1rem" }}>THE WARDEN HAS BEEN AWAY FOR</h3>
+                <div class="doko-section">
+                    <h3 class="serif section-header">THE WARDEN HAS BEEN AWAY FOR</h3>
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                         <TimeSinceKronii krdate={data.krlastdate} transparent={!showForecast} />
                     </div>
                 </div>
 
-                <div style={{ margin: "2rem 0" }}>
-                    <h3 class="serif" style={{ marginBottom: "1rem" }}>NO KRONIIUM SINCE</h3>
+                <div class="doko-section" id="laststream">
+                    <h3 class="serif section-header">NO KRONIIUM SINCE</h3>
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                         <div class={`info-card-box ${!showForecast ? 'transparent' : ''}`}>
                             <h2 class="date-display">{krlastdatetimestr}</h2>
                         </div>
                     </div>
                 </div>
-                <br />
                 {
                     (params.next) ?
                         (data.krnext) ?

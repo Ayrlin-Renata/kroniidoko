@@ -3,11 +3,9 @@ import * as ort from "onnxruntime-web";
 import { getForecastHistory } from "../utils";
 import "./Forecast.css";
 
-// Configure WASM paths
 ort.env.wasm.wasmPaths = "/";
 
-const MODEL_THRESHOLD = 0.5; // From original forecast config.js
-
+const MODEL_THRESHOLD = 0.5;
 interface DayForecast {
     name: string;
     probs: number[];
@@ -23,11 +21,9 @@ interface ForecastState {
 
 const TIMEZONES = (() => {
     const zones = [];
-    // Include user local timezone logic in render, giving full range here
     for (let i = -12; i <= 14; i++) {
         const sign = i >= 0 ? '+' : '';
         const label = `UTC${sign}${i}`;
-        // Etc/GMT signs are inverted: UTC+5 is Etc/GMT-5
         const value = `Etc/GMT${i > 0 ? '-' : '+'}${Math.abs(i)}`;
         zones.push({ label, value });
     }
@@ -52,7 +48,6 @@ export default class Forecast extends Component<{}, ForecastState> {
     async componentDidMount() {
         this.mounted = true;
         try {
-            // Load from public folder
             this.session = await ort.InferenceSession.create("/model.onnx", {
                 executionProviders: ["wasm"],
             });
@@ -87,9 +82,7 @@ export default class Forecast extends Component<{}, ForecastState> {
 
         this.setState({ status: "Processing..." });
 
-        // --- Feature Engineering (Ported from Forecast app.js) ---
         const lastStream = history[0];
-        // Note: Holodex.js returns camelCase
         const isLive = lastStream.status === "live";
         const lastStartStr = lastStream.actualStart || lastStream.availableAt;
         const lastStart = new Date(lastStartStr);
@@ -116,8 +109,7 @@ export default class Forecast extends Component<{}, ForecastState> {
         const wasStreamingAt = (timestamp: Date) => {
             const tTime = timestamp.getTime();
             for (let vid of history) {
-                if (!vid.actualStart) continue; // Skip if no start info
-                const start = new Date(vid.actualStart).getTime();
+                if (!vid.actualStart) continue; const start = new Date(vid.actualStart).getTime();
                 if (start >= tTime && start < tTime + 3600000) {
                     return 1.0;
                 }
@@ -125,8 +117,6 @@ export default class Forecast extends Component<{}, ForecastState> {
             return 0.0;
         };
 
-        // Generate enough hours to cover partial starts and full 7 days (+ extra)
-        // 8 full days = 192 hours. Lets go 200 safer.
         for (let i = 0; i < 200; i++) {
             const t = new Date(current.getTime() + i * 3600 * 1000);
             times.push(t);
@@ -155,14 +145,11 @@ export default class Forecast extends Component<{}, ForecastState> {
             );
         }
 
-        // Inference
         try {
             const tensor = new ort.Tensor('float32', Float32Array.from(inputs), [200, 9]);
             const feeds = { float_input: tensor };
-            // @ts-ignore - OutputNames might vary, simplified for now
             const results = await this.session.run(feeds);
 
-            // Dynamic output name handling
             const outputKey = this.session.outputNames[1] || this.session.outputNames[0];
             const probs = results[outputKey].data as Float32Array;
 
@@ -184,11 +171,9 @@ export default class Forecast extends Component<{}, ForecastState> {
         const daysMap: Record<string, DayForecast> = {};
         const { timezone } = this.state;
 
-        // Track unique days specifically to maintain order
         const uniqueDayNames: string[] = [];
 
         times.forEach((t, i) => {
-            // Use selected timezone
             const dayName = t.toLocaleDateString('en-US', {
                 weekday: 'short',
                 day: 'numeric',
@@ -210,29 +195,22 @@ export default class Forecast extends Component<{}, ForecastState> {
             if (p >= MODEL_THRESHOLD) daysMap[dayName].highProbCount++;
         });
 
-        // Slice to first 7 days found
         const finalDays = uniqueDayNames.slice(0, 7).map(name => daysMap[name]);
 
         this.setState({ days: finalDays });
     }
 
-    // Helper for sparkline
     renderSparkline(probs: number[]) {
-        // Pad Y to avoid clipping at 0 and 100%
-        // Map 0..1 to 95..5 (SVG coordinates, 0 is top)
         const points = probs.map((p, i) => {
             const div = probs.length > 1 ? (probs.length - 1) : 1;
             const x = (i / div) * 100;
 
-            // Constrain p to 0-1 for safety
             const val = Math.max(0, Math.min(1, p));
-            // Top (100%) -> y=5, Bottom (0%) -> y=95
             const y = 95 - (val * 90);
 
             return `${x},${y}`;
         });
 
-        // Fill goes to bottom (100)
         const pathData = `M 0,100 L ${points.join(' L ')} L 100,100 Z`;
         const lineData = `M ${points.join(' L ')}`;
 
@@ -251,9 +229,6 @@ export default class Forecast extends Component<{}, ForecastState> {
 
     handleTimezoneChange = (e: any) => {
         this.setState({ timezone: e.target.value }, () => {
-            // Re-process current data if we had stored it, but simplistic way is just re-fetch/re-calc
-            // Since we don't store raw history in state, let's just trigger updateView
-            // Or better, just re-run updateView which isn't too expensive
             this.updateView();
         });
     }
@@ -261,8 +236,6 @@ export default class Forecast extends Component<{}, ForecastState> {
     render() {
         const { days, timezone } = this.state;
 
-        // Check if current timezone is one of our generated UTC zones
-        // const isStandard = TIMEZONES.some(tz => tz.value === timezone);
 
         return (
             <div class="forecast-section">

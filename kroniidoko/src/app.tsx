@@ -13,7 +13,6 @@ export function App() {
         <Logo id="logo" color="#ddd" />
         <h1 id="titleheading" class="serif">kronii doko?</h1>
       </div>
-      <br />
       <div class="card">
         <Doko next={true} hideForecast={hideForecast} />
       </div>

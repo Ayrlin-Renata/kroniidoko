@@ -1,6 +1,4 @@
-/* Forecast Component Styles */
 .forecast-section {
-    /* Match card style roughly, or transparent inside the container */
     background-color: transparent;
     color: #ffffff;
     padding: 10px 0;
@@ -66,20 +64,16 @@
 .forecast-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    /* Larger minimum width */
     gap: 15px;
 }
 
 .day-card {
     background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(32, 32, 53, 0.95));
-    /* Subtle gradient */
     border: none;
-    /* No border */
     border-radius: 12px;
     position: relative;
     overflow: hidden;
     height: 150px;
-    /* Taller */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -96,7 +90,6 @@
 
 .day-card.active {
     box-shadow: 0 0 15px rgba(3, 218, 198, 0.2);
-    /* Cyan glow instead of border */
 }
 
 .day-header {
@@ -127,16 +120,13 @@
     left: 0;
     width: 100%;
     height: 100%;
-    /* Full height */
     z-index: 1;
     pointer-events: none;
     opacity: 0.6;
-    /* Brighter */
 }
 
 .sparkline-fill {
     fill: #bbc8ff;
-    /* Bright Blue (DeepSkyBlue) */
     stroke: none;
     opacity: 0.2;
 }
@@ -144,7 +134,70 @@
 .sparkline-path {
     fill: none;
     stroke: #ffffff;
-    /* Bright Blue */
     stroke-width: 2;
     filter: drop-shadow(0 0 2px rgb(255, 255, 255));
+}
+
+@media (max-width: 600px) {
+
+    .forecast-grid {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+        width: 100%;
+    }
+
+    .forecast-actions,
+    .timezone-select,
+    .icon-btn {
+        display: none !important;
+    }
+
+    .forecast-controls-bar {
+        justify-content: center;
+        margin-bottom: 8px;
+        padding-bottom: 0px;
+        border: none;
+    }
+
+    .forecast-header {
+        font-size: 0.8rem;
+        text-align: center;
+        width: 100%;
+    }
+
+    .day-card {
+        height: 85px;
+        padding: 2px;
+        border-radius: 4px;
+        justify-content: flex-start;
+    }
+
+    .day-header {
+        font-size: 0.75rem;
+        line-height: 1;
+        margin-bottom: 2px;
+        padding-top: 2px;
+    }
+
+    .day-prob {
+        font-size: 0.9rem;
+        z-index: 2;
+        margin-bottom: 0;
+        padding-top: 5px;
+    }
+
+    .day-icon {
+        display: block;
+        font-size: 1.5rem;
+        padding-top: 8px;
+        line-height: 1;
+    }
+
+    .sparkline-container {
+        opacity: 0.4;
+    }
+
+    .forecast-section {
+        margin-top: 10px;
+    }
 }
