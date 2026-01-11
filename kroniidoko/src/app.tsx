@@ -4,6 +4,9 @@ import Logo from './components/Logo'
 import DokoShare from './components/DokoShare'
 
 export function App() {
+  const params = new URLSearchParams(window.location.search);
+  const hideForecast = params.has('no_forecast') || params.get('forecast') === '0' || params.get('forecast') === 'false';
+
   return (
     <>
       <div id="topbar">
@@ -12,7 +15,7 @@ export function App() {
       </div>
       <br />
       <div class="card">
-        <Doko next={true} />
+        <Doko next={true} hideForecast={hideForecast} />
       </div>
       <br />
       <br />

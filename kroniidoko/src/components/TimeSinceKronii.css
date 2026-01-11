@@ -65,3 +65,50 @@
     font-size: 2rem;
     font-weight: 100;
 }
+
+/* Responsive adjustments for small screens/tiles */
+@media (max-width: 600px) {
+    .info-card-box {
+        gap: 0.5rem;
+        padding: 15px 10px;
+    }
+
+    .time-unit {
+        width: 70px;
+        /* Shrink width */
+    }
+
+    .time-val {
+        font-size: 2.2rem;
+        /* Shrink font significantly */
+        margin-bottom: 0px;
+    }
+
+    .time-label {
+        font-size: 0.8rem;
+    }
+
+    .date-display {
+        font-size: 1.2rem;
+    }
+
+    /* Even smaller screens (e.g. very small tiles) */
+    @media (max-width: 350px) {
+        .time-unit {
+            width: auto;
+            min-width: 40px;
+        }
+
+        .time-val {
+            font-size: 1.5rem;
+        }
+
+        .time-label {
+            font-size: 0.6rem;
+        }
+
+        .info-card-box {
+            padding: 10px 5px;
+        }
+    }
+}
