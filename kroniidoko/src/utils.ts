@@ -188,6 +188,8 @@ export async function getKrData() {
     return {
         live: isLive,
         krlastdate: krlastvideo?.actualEnd || krlastvideo?.availableAt || new Date(),
+        krlasttitle: krlastvideo?.title || "",
+        krlastid: krlastvideo?.videoId,
         krnext: true,
         krnexttitle: krnextvideo?.title || "",
         krnextdate: krnextvideo?.scheduledStart || krnextvideo?.availableAt,
@@ -205,14 +207,32 @@ async function getPastStream(client: HolodexApiClient) {
 
     pastTimestamp = Date.now();
     pastPromise = (async () => {
-        const videos = await client.getVideos({
-            channel_id: THEME_CACHE.CHANNEL_ID,
+        const params = {
             include: ["live_info"],
             limit: 1,
-            type: "stream",
+            type: ["stream"],
             status: "past",
-        } as any);
-        return videos[0];
+        } as any;
+
+        try {
+            const [direct, mentions] = await Promise.all([
+                client.getVideos({ ...params, channel_id: THEME_CACHE.CHANNEL_ID }),
+                client.getVideos({ ...params, mentioned_channel_id: THEME_CACHE.CHANNEL_ID })
+            ]);
+
+            const all = [...direct, ...mentions];
+
+            all.sort((a, b) => {
+                const endA = new Date(a.actualEnd || a.actualStart || a.availableAt || 0).getTime();
+                const endB = new Date(b.actualEnd || b.actualStart || b.availableAt || 0).getTime();
+                return endB - endA;
+            });
+
+            return all[0];
+        } catch (e) {
+            console.error("Failed to fetch past stream", e);
+            return undefined as any;
+        }
     })();
 
     return pastPromise;
@@ -227,7 +247,7 @@ export async function getForecastHistory(): Promise<Video[]> {
     const client = await getClient();
     const videos = await client.getVideos({
         channel_id: THEME_CACHE.CHANNEL_ID,
-        type: "stream",
+        type: ["stream"],
         status: ["live", "past"],
         include: [],  // prevent 'undefined'
         limit: 50,

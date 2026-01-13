@@ -3,6 +3,12 @@ import './app.css'
 import Logo from './components/Logo'
 import DokoShare from './components/DokoShare'
 
+/*
+ * USES HOLODEX. 
+ * LICENSE: https://docs.holodex.net/#section/LICENSE
+ * https://holodex.net
+ */
+
 export function App() {
   const params = new URLSearchParams(window.location.search);
   const hideForecast = params.has('no_forecast') || params.get('forecast') === '0' || params.get('forecast') === 'false';

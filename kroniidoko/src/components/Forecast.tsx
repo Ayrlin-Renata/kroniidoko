@@ -3,7 +3,7 @@ import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
 import "./Forecast.css";
 
-ort.env.wasm.wasmPaths = "/";
+ort.env.wasm.wasmPaths = "./";
 
 const MODEL_THRESHOLD = 0.5;
 interface DayForecast {
@@ -49,7 +49,7 @@ export default class Forecast extends Component<{}, ForecastState> {
     async componentDidMount() {
         this.mounted = true;
         try {
-            this.session = await ort.InferenceSession.create("/model.onnx", {
+            this.session = await ort.InferenceSession.create("model.onnx", {
                 executionProviders: ["wasm"],
             });
             this.updateView();

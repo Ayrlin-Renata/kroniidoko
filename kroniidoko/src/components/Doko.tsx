@@ -12,6 +12,8 @@ type DState = {
     data: {
         live: Boolean,
         krlastdate: Date,
+        krlasttitle: String,
+        krlastid: String,
         krnext: Boolean,
         krnexttitle: String,
         krnextdate: Date,
@@ -27,6 +29,8 @@ export default class Doko extends Component<DParams, DState> {
             data: {
                 live: false,
                 krlastdate: new Date(),
+                krlasttitle: "",
+                krlastid: "",
                 krnext: false,
                 krnexttitle: "",
                 krnextdate: new Date(),
@@ -41,6 +45,8 @@ export default class Doko extends Component<DParams, DState> {
             data: {
                 live: res.live,
                 krlastdate: res.krlastdate,
+                krlasttitle: res.krlasttitle,
+                krlastid: res.krlastid,
                 krnext: res.krnext,
                 krnexttitle: res.krnexttitle,
                 krnextdate: res.krnextdate,
@@ -83,10 +89,18 @@ export default class Doko extends Component<DParams, DState> {
 
                 <div class="doko-section" id="laststream">
                     <h3 class="serif section-header">NO KRONIIUM SINCE</h3>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
                         <div class={`info-card-box ${!showForecast ? 'transparent' : ''}`}>
                             <h2 class="date-display">{krlastdatetimestr}</h2>
                         </div>
+                        {showForecast && data.krlasttitle && (
+                            <div class="last-seen-container">
+                                <h3 class="serif">LAST SEEN AT</h3>
+                                <h3 class="serif">
+                                    <a href={"https://youtube.com/watch?v=" + data.krlastid}>{data.krlasttitle}</a>
+                                </h3>
+                            </div>
+                        )}
                     </div>
                 </div>
                 {
