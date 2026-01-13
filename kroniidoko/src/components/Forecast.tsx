@@ -1,6 +1,6 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
-import { getForecastHistory } from "../utils";
+import { getForecastHistory, getScheduledStreams } from "../utils";
 import "./Forecast.css";
 
 ort.env.wasm.wasmPaths = "/";
@@ -9,6 +9,7 @@ const MODEL_THRESHOLD = 0.5;
 interface DayForecast {
     name: string;
     probs: number[];
+    scheduledProbs: number[];
     maxProb: number;
     highProbCount: number;
 }
@@ -158,7 +159,8 @@ export default class Forecast extends Component<{}, ForecastState> {
                 streamProbs.push(probs[i * 2 + 1]);
             }
 
-            this.processForecast(times, streamProbs);
+            const scheduled = await getScheduledStreams();
+            this.processForecast(times, streamProbs, scheduled);
             if (this.mounted) this.setState({ status: "Ready" });
 
         } catch (e) {
@@ -167,7 +169,7 @@ export default class Forecast extends Component<{}, ForecastState> {
         }
     };
 
-    processForecast(times: Date[], probs: number[]) {
+    processForecast(times: Date[], probs: number[], scheduled: any[]) {
         const daysMap: Record<string, DayForecast> = {};
         const { timezone } = this.state;
 
@@ -193,6 +195,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                 daysMap[dayName] = {
                     name: dayName,
                     probs: new Array(24).fill(0),
+                    scheduledProbs: new Array(24).fill(0),
                     maxProb: 0,
                     highProbCount: 0
                 };
@@ -203,8 +206,34 @@ export default class Forecast extends Component<{}, ForecastState> {
                 daysMap[dayName].probs[hourInTz] = p;
             }
 
+            let schedProb = 0;
+            if (scheduled && scheduled.length > 0) {
+                for (let vid of scheduled) {
+                    const startRaw = vid.scheduledStart || vid.availableAt;
+                    if (!startRaw) continue;
+                    const start = new Date(startRaw).getTime();
+                    const now = t.getTime();
+
+                    if (now >= start) {
+                        const hoursSinceStart = (now - start) / (1000 * 3600);
+
+                        if (hoursSinceStart < 1.0) {
+                            schedProb = Math.max(schedProb, 0.995);
+                        } else {
+                            const decay = 0.995 / (1 + Math.exp(2 * (hoursSinceStart - 3.27)));
+                            schedProb = Math.max(schedProb, decay);
+                        }
+                    }
+                }
+            }
+
+            if (daysMap[dayName].scheduledProbs[hourInTz] !== undefined) {
+                daysMap[dayName].scheduledProbs[hourInTz] = schedProb;
+            }
+
             if (p > daysMap[dayName].maxProb) daysMap[dayName].maxProb = p;
-            if (p >= MODEL_THRESHOLD) daysMap[dayName].highProbCount++;
+            if (schedProb > daysMap[dayName].maxProb) daysMap[dayName].maxProb = schedProb;
+            if (p >= MODEL_THRESHOLD || schedProb >= MODEL_THRESHOLD) daysMap[dayName].highProbCount++;
         });
 
         const finalDays = uniqueDayNames.slice(0, 7).map(name => daysMap[name]);
@@ -212,24 +241,45 @@ export default class Forecast extends Component<{}, ForecastState> {
         this.setState({ days: finalDays });
     }
 
-    renderSparkline(probs: number[], nowX: number | null = null) {
-        const points = probs.map((p, i) => {
+    renderSparkline(probs: number[], scheduledProbs: number[], nowX: number | null = null) {
+        const getPoints = (data: number[]) => data.map((p, i) => {
             const x = (i / 23) * 100;
-
             const val = Math.max(0, Math.min(1, p));
             const y = 95 - (val * 90);
-
             return `${x},${y}`;
         });
 
-        const pathData = `M 0,100 L ${points.join(' L ')} L 100,100 Z`;
-        const lineData = `M ${points.join(' L ')}`;
+        const mlPoints = getPoints(probs);
+        const schedPoints = getPoints(scheduledProbs);
+
+        const mlLine = `M ${mlPoints.join(' L ')}`;
+        const mlFill = `M 0,100 L ${mlPoints.join(' L ')} L 100,100 Z`;
+
+        const schedLine = `M ${schedPoints.join(' L ')}`;
+        const schedFill = `M 0,100 L ${schedPoints.join(' L ')} L 100,100 Z`;
+
+        const hasSched = scheduledProbs.some(p => p > 0.1);
 
         return (
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%; height:100%; overflow: visible;">
-                <path d={pathData} class="sparkline-fill" />
+                {hasSched && (
+                    <>
+                        <path d={schedFill} fill="rgba(33, 150, 243, 0.2)" stroke="none" />
+                        <path
+                            d={schedLine}
+                            stroke="#2196f3"
+                            stroke-width="2"
+                            fill="none"
+                            stroke-dasharray="4"
+                            vectorEffect="non-scaling-stroke"
+                            style={{ vectorEffect: 'non-scaling-stroke', opacity: 0.8 }}
+                        />
+                    </>
+                )}
+
+                <path d={mlFill} class="sparkline-fill" />
                 <path
-                    d={lineData}
+                    d={mlLine}
                     class="sparkline-path"
                     vectorEffect="non-scaling-stroke"
                     style={{ vectorEffect: 'non-scaling-stroke' }}
@@ -238,7 +288,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                     <line
                         x1={nowX} y1="0"
                         x2={nowX} y2="100"
-                        stroke="#00bfff" /* Deep Sky Blue */
+                        stroke="#00bfff"
                         stroke-width="1.5"
                         vectorEffect="non-scaling-stroke"
                         style={{ vectorEffect: 'non-scaling-stroke', opacity: 0.8 }}
@@ -297,7 +347,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                                 </span>
                                 <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
                                 <div class="sparkline-container">
-                                    {this.renderSparkline(day.probs, isToday ? currentX : null)}
+                                    {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
                                 </div>
                             </div>
                         );

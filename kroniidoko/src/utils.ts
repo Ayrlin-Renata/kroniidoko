@@ -59,6 +59,9 @@ async function getDecryptedKey(): Promise<string | null> {
 
 let clientInstance: HolodexApiClient | null = null;
 
+let schedulePromise: Promise<Video[]> | null = null;
+let scheduleTimestamp = 0;
+
 async function getClient(): Promise<HolodexApiClient> {
     if (clientInstance) return clientInstance;
 
@@ -78,65 +81,146 @@ async function getClient(): Promise<HolodexApiClient> {
     return clientInstance;
 }
 
+// /live w/ mentions
+async function fetchLiveAndUpcoming_Legacy(): Promise<Video[]> {
+    if (schedulePromise && (Date.now() - scheduleTimestamp < 60000)) {
+        return schedulePromise;
+    }
+
+    scheduleTimestamp = Date.now();
+    schedulePromise = (async () => {
+        const client = await getClient();
+
+        const params = {
+            include: ["live_info"],
+            limit: 50,
+            type: ["stream", "placeholder"],
+            status: ["upcoming", "live"],
+            order: 'asc'
+        } as any;
+
+        try {
+            const [direct, mentions] = await Promise.all([
+                client.getLiveVideos({ ...params, channel_id: THEME_CACHE.CHANNEL_ID, includePlaceholder: true }),
+                client.getLiveVideos({ ...params, mentioned_channel_id: THEME_CACHE.CHANNEL_ID })
+            ]);
+
+            const all = [...direct, ...mentions];
+            const unique = Array.from(new Map(all.map(v => [v.videoId, v])).values());
+
+            unique.sort((a, b) => {
+                const dA = new Date(a.scheduledStart || a.availableAt || 0).getTime();
+                const dB = new Date(b.scheduledStart || b.availableAt || 0).getTime();
+                return dA - dB;
+            });
+
+            return unique;
+        } catch (e) {
+            console.error("Failed to fetch schedule", e);
+            return [];
+        }
+    })();
+
+    return schedulePromise;
+}
+
+// users/live
+async function fetchLiveAndUpcoming(): Promise<Video[]> {
+    if (schedulePromise && (Date.now() - scheduleTimestamp < 60000)) {
+        return schedulePromise;
+    }
+
+    scheduleTimestamp = Date.now();
+    schedulePromise = (async () => {
+        const client = await getClient();
+        try {
+            // @ts-ignore - need to use includePlaceholder
+            const { data } = await client.httpClient.get(`/users/live?channels=${THEME_CACHE.CHANNEL_ID}&includePlaceholder=true`);
+            const videos = data.map((v: any) => new Video(v));
+
+            // Ensure sorting just in case API doesnt
+            videos.sort((a: Video, b: Video) => {
+                const dA = new Date(a.scheduledStart || a.availableAt || 0).getTime();
+                const dB = new Date(b.scheduledStart || b.availableAt || 0).getTime();
+                return dA - dB;
+            });
+
+            return videos;
+        } catch (e) {
+            console.error("Failed to fetch schedule (optimized)", e);
+            try {
+                scheduleTimestamp = 0;
+                return await fetchLiveAndUpcoming_Legacy();
+            } catch (e2) {
+                console.error("Legacy fallback also failed", e2);
+            }
+            return [];
+        }
+    })();
+    return schedulePromise;
+}
 
 export async function getKrData() {
     const client = await getClient();
-
     const krlastvideo = await getPastStream(client);
-    let krnextvideo;
-    const live = await isLive(client);
-    if (live) {
-        krnextvideo = await getStream(client, "live");
-    } else {
-        krnextvideo = await getStream(client, "upcoming");
+
+    const relevantStreams = await fetchLiveAndUpcoming();
+
+    const liveVideo = relevantStreams.find(v => v.status === 'live');
+    const isLive = !!liveVideo;
+
+    let krnextvideo = liveVideo;
+    if (!krnextvideo) {
+        krnextvideo = relevantStreams.find(v => v.status === 'upcoming');
     }
 
     let krnext = !!krnextvideo;
     if (!krnext) {
         return {
-            live: live,
+            live: isLive,
             krlastdate: krlastvideo?.actualEnd || krlastvideo?.availableAt || new Date(),
-            krnext: krnext,
+            krnext: false,
             krnexttitle: "",
             krnextdate: new Date(),
             krnextid: ""
         } as any;
     }
     return {
-        live: live,
+        live: isLive,
         krlastdate: krlastvideo?.actualEnd || krlastvideo?.availableAt || new Date(),
-        krnext: !!krnextvideo,
-        krnexttitle: krnextvideo.title || "",
-        krnextdate: krnextvideo.scheduledStart || krnextvideo.availableAt,
-        krnextid: krnextvideo.videoId
+        krnext: true,
+        krnexttitle: krnextvideo?.title || "",
+        krnextdate: krnextvideo?.scheduledStart || krnextvideo?.availableAt,
+        krnextid: krnextvideo?.videoId
     }
 }
 
-async function isLive(client: HolodexApiClient) {
-    const video = await getStream(client, "live");
-    return !!video;
-}
+let pastPromise: Promise<Video> | null = null;
+let pastTimestamp = 0;
 
 async function getPastStream(client: HolodexApiClient) {
-    const videos = await client.getVideos({
-        channel_id: THEME_CACHE.CHANNEL_ID,
-        include: ["live_info", "mentions"],
-        limit: 1,
-        type: "stream",
-        status: "past",
-    } as any);
-    return videos[0];
+    if (pastPromise && (Date.now() - pastTimestamp < 60000)) {
+        return pastPromise;
+    }
+
+    pastTimestamp = Date.now();
+    pastPromise = (async () => {
+        const videos = await client.getVideos({
+            channel_id: THEME_CACHE.CHANNEL_ID,
+            include: ["live_info"],
+            limit: 1,
+            type: "stream",
+            status: "past",
+        } as any);
+        return videos[0];
+    })();
+
+    return pastPromise;
 }
 
-async function getStream(client: HolodexApiClient, when: "live" | "upcoming") {
-    const videos = await client.getLiveVideos({
-        channel_id: THEME_CACHE.CHANNEL_ID,
-        include: ["live_info", "mentions"],
-        limit: 10,
-        type: "stream",
-        status: when,
-    } as any);
-    return videos[0];
+export async function getScheduledStreams() {
+    const videos = await fetchLiveAndUpcoming();
+    return videos;
 }
 
 export async function getForecastHistory(): Promise<Video[]> {
@@ -145,6 +229,7 @@ export async function getForecastHistory(): Promise<Video[]> {
         channel_id: THEME_CACHE.CHANNEL_ID,
         type: "stream",
         status: ["live", "past"],
+        include: [],  // prevent 'undefined'
         limit: 50,
         order: 'desc'
     } as any);
