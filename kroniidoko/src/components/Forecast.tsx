@@ -1,6 +1,7 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
+import { HEATMAP_PRIOR } from "./ForecastConstants";
 import "./Forecast.css";
 
 ort.env.wasm.wasmPaths = "./";
@@ -54,7 +55,7 @@ export default class Forecast extends Component<{}, ForecastState> {
             });
             this.updateView();
         } catch (e) {
-            console.error(e);
+            console.error("Model Load Error:", e);
             if (this.mounted) this.setState({ status: "Error loading model." });
         }
     }
@@ -82,6 +83,8 @@ export default class Forecast extends Component<{}, ForecastState> {
         }
 
         this.setState({ status: "Processing..." });
+
+        const scheduled = await getScheduledStreams();
 
         const lastStream = history[0];
         const isLive = lastStream.status === "live";
@@ -118,6 +121,16 @@ export default class Forecast extends Component<{}, ForecastState> {
             return 0.0;
         };
 
+        const dowTotalStreams = history.length || 1;
+        const indexToDow = [0, 1, 2, 3, 4, 5, 6];
+        const dowIntensityMap = indexToDow.map(dowIdx => {
+            const count = history.filter(v => {
+                if (!v.actualStart) return false;
+                return new Date(v.actualStart).getUTCDay() === dowIdx;
+            }).length;
+            return (count / dowTotalStreams) * 0.2;
+        });
+
         for (let i = 0; i < 200; i++) {
             const t = new Date(current.getTime() + i * 3600 * 1000);
             times.push(t);
@@ -135,19 +148,55 @@ export default class Forecast extends Component<{}, ForecastState> {
 
             const time24 = new Date(t.getTime() - 24 * 3600 * 1000);
             const time168 = new Date(t.getTime() - 168 * 3600 * 1000);
+            const time336 = new Date(t.getTime() - 14 * 24 * 3600 * 1000);
+            const time504 = new Date(t.getTime() - 21 * 24 * 3600 * 1000);
 
             const stream_24 = wasStreamingAt(time24);
             const stream_168 = wasStreamingAt(time168);
+            const stream_336 = wasStreamingAt(time336);
+            const stream_504 = wasStreamingAt(time504);
+
+            const rolling_3d = history.filter(v => {
+                if (!v.actualStart) return false;
+                const d = new Date(v.actualStart).getTime();
+                const diff = t.getTime() - d;
+                return diff > 0 && diff < (3 * 24 * 3600 * 1000);
+            }).length;
+
+            const rolling_7d = history.filter(v => {
+                if (!v.actualStart) return false;
+                const d = new Date(v.actualStart).getTime();
+                const diff = t.getTime() - d;
+                return diff > 0 && diff < (7 * 24 * 3600 * 1000);
+            }).length;
+
+            const rolling_14d = history.filter(v => {
+                if (!v.actualStart) return false;
+                const d = new Date(v.actualStart).getTime();
+                const diff = t.getTime() - d;
+                return diff > 0 && diff < (14 * 24 * 3600 * 1000);
+            }).length;
+
+            const recentFrequency = rolling_3d / (rolling_14d / 4.6 + 0.1);
+            const dowIntensity = dowIntensityMap[dow];
+
+            const hourIndex = dow * 24 + hour;
+            const heatmapPrior = HEATMAP_PRIOR[hourIndex] || 0;
+
+            const daysSinceLastStream = hours_since_stream / 24.0;
 
             inputs.push(
                 hour_sin, hour_cos, day_sin, day_cos,
                 hours_since_stream, hours_since_start, durationHours,
-                stream_24, stream_168
+                stream_24, stream_168, stream_336, stream_504,
+                rolling_7d, dowIntensity,
+                recentFrequency, daysSinceLastStream,
+                heatmapPrior
             );
         }
 
         try {
-            const tensor = new ort.Tensor('float32', Float32Array.from(inputs), [200, 9]);
+            const tensor = new ort.Tensor('float32', Float32Array.from(inputs), [200, 16]);
             const feeds = { float_input: tensor };
             const results = await this.session.run(feeds);
 
@@ -159,12 +208,11 @@ export default class Forecast extends Component<{}, ForecastState> {
                 streamProbs.push(probs[i * 2 + 1]);
             }
 
-            const scheduled = await getScheduledStreams();
             this.processForecast(times, streamProbs, scheduled);
             if (this.mounted) this.setState({ status: "Ready" });
 
         } catch (e) {
-            console.error("Inference Error", e);
+            console.error("Inference Error:", e);
             if (this.mounted) this.setState({ status: "Prediction Error" });
         }
     };
