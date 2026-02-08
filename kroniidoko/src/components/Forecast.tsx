@@ -1,12 +1,11 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
-import { HEATMAP_PRIOR } from "./ForecastConstants";
+import { HEATMAP_PRIOR, MODEL_THRESHOLD } from "./ForecastConstants";
 import "./Forecast.css";
 
 ort.env.wasm.wasmPaths = "./";
 
-const MODEL_THRESHOLD = 0.5;
 interface DayForecast {
     name: string;
     probs: number[];
