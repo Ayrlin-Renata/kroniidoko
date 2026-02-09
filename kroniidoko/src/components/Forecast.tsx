@@ -1,7 +1,7 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
-import { HEATMAP_PRIOR, MODEL_THRESHOLD } from "./ForecastConstants";
+import { HEATMAP_PRIOR, MODEL_THRESHOLD, FORECAST_METRICS } from "./ForecastConstants";
 import "./Forecast.css";
 
 ort.env.wasm.wasmPaths = "./";
@@ -87,14 +87,14 @@ export default class Forecast extends Component<{}, ForecastState> {
 
         const lastStream = history[0];
         const isLive = lastStream.status === "live";
-        const lastStartStr = lastStream.actualStart || lastStream.availableAt;
+        const lastStartStr = (lastStream as any).start_actual || (lastStream as any).available_at || lastStream.actualStart || lastStream.availableAt;
         const lastStart = new Date(lastStartStr);
 
         let lastEnd: Date;
         if (isLive) {
             lastEnd = new Date();
         } else {
-            const lastEndStr = lastStream.actualEnd || lastStartStr;
+            const lastEndStr = (lastStream as any).end_actual || lastStartStr;
             lastEnd = new Date(lastEndStr);
         }
 
@@ -112,7 +112,9 @@ export default class Forecast extends Component<{}, ForecastState> {
         const wasStreamingAt = (timestamp: Date) => {
             const tTime = timestamp.getTime();
             for (let vid of history) {
-                if (!vid.actualStart) continue; const start = new Date(vid.actualStart).getTime();
+                const startStr = (vid as any).start_actual || vid.actualStart;
+                if (!startStr) continue;
+                const start = new Date(startStr).getTime();
                 if (start >= tTime && start < tTime + 3600000) {
                     return 1.0;
                 }
@@ -124,8 +126,9 @@ export default class Forecast extends Component<{}, ForecastState> {
         const indexToDow = [0, 1, 2, 3, 4, 5, 6];
         const dowIntensityMap = indexToDow.map(dowIdx => {
             const count = history.filter(v => {
-                if (!v.actualStart) return false;
-                return new Date(v.actualStart).getUTCDay() === dowIdx;
+                const startStr = (v as any).start_actual || v.actualStart;
+                if (!startStr) return false;
+                return new Date(startStr).getUTCDay() === dowIdx;
             }).length;
             return (count / dowTotalStreams) * 0.2;
         });
@@ -156,22 +159,25 @@ export default class Forecast extends Component<{}, ForecastState> {
             const stream_504 = wasStreamingAt(time504);
 
             const rolling_3d = history.filter(v => {
-                if (!v.actualStart) return false;
-                const d = new Date(v.actualStart).getTime();
+                const startStr = (v as any).start_actual || v.actualStart;
+                if (!startStr) return false;
+                const d = new Date(startStr).getTime();
                 const diff = t.getTime() - d;
                 return diff > 0 && diff < (3 * 24 * 3600 * 1000);
             }).length;
 
             const rolling_7d = history.filter(v => {
-                if (!v.actualStart) return false;
-                const d = new Date(v.actualStart).getTime();
+                const startStr = (v as any).start_actual || v.actualStart;
+                if (!startStr) return false;
+                const d = new Date(startStr).getTime();
                 const diff = t.getTime() - d;
                 return diff > 0 && diff < (7 * 24 * 3600 * 1000);
             }).length;
 
             const rolling_14d = history.filter(v => {
-                if (!v.actualStart) return false;
-                const d = new Date(v.actualStart).getTime();
+                const startStr = (v as any).start_actual || v.actualStart;
+                if (!startStr) return false;
+                const d = new Date(startStr).getTime();
                 const diff = t.getTime() - d;
                 return diff > 0 && diff < (14 * 24 * 3600 * 1000);
             }).length;
@@ -383,18 +389,33 @@ export default class Forecast extends Component<{}, ForecastState> {
                 </div>
 
                 <div class="forecast-grid">
-                    {days.map(day => {
+                    {days.map((day, index) => {
                         const isActive = day.maxProb >= MODEL_THRESHOLD;
                         const isToday = day.name === todayName;
+                        const metrics = FORECAST_METRICS[index] || { recall: 0, precision: 0, f1: 0 };
+
+                        const getMetricClass = (val: number, threshold: number) => {
+                            if (val === 0) return 'zero';
+                            if (val >= threshold) return 'high';
+                            return '';
+                        };
+
                         return (
-                            <div class={`day-card ${isActive ? 'active' : ''}`}>
-                                <span class="day-header">{day.name}</span>
-                                <span class={`material-icons day-icon ${isActive ? 'active' : 'inactive'}`}>
-                                    {isActive ? 'alarm_on' : 'alarm_off'}
-                                </span>
-                                <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
-                                <div class="sparkline-container">
-                                    {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
+                            <div class="day-container">
+                                <div class={`day-card ${isActive ? 'active' : ''}`}>
+                                    <span class="day-header">{day.name}</span>
+                                    <span class={`material-icons day-icon ${isActive ? 'active' : 'inactive'}`}>
+                                        {isActive ? 'alarm_on' : 'alarm_off'}
+                                    </span>
+                                    <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
+                                    <div class="sparkline-container">
+                                        {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
+                                    </div>
+                                </div>
+                                <div class="day-metrics" title={`Recall: ${metrics.recall}%, Precision: ${metrics.precision}%, F1: ${metrics.f1}`}>
+                                    <span class={getMetricClass(metrics.recall, 50)}>R:{metrics.recall.toFixed(0)}</span>
+                                    <span class={getMetricClass(metrics.precision, 50)}>P:{metrics.precision.toFixed(0)}</span>
+                                    <span class={getMetricClass(metrics.f1, 0.5)}>F1:{metrics.f1.toFixed(2)}</span>
                                 </div>
                             </div>
                         );
