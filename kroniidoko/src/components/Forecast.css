@@ -235,8 +235,3 @@
 .day-card.active+.day-metrics {
     color: #888;
 }
-
-.day-card.active+.day-metrics span {
-    color: #03dac6;
-    opacity: 0.8;
-}
