@@ -20,9 +20,41 @@
 
 .forecast-header {
     margin: 0;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     color: #ddd;
     text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-grow: 1;
+    margin-left: 20px;
+    font-size: 0.9rem;
+    color: #888;
+}
+
+.spinner-small {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #03dac6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.status-text {
+    font-style: italic;
 }
 
 .forecast-actions {
@@ -63,8 +95,16 @@
 
 .forecast-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    transition: opacity 0.3s ease;
+    width: 100%;
+    min-width: 0;
+}
+
+.grid-loading {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 .day-card {
@@ -93,15 +133,16 @@
 }
 
 .day-header {
-    font-size: 1.2rem;
+    font-size: 1rem;
     color: #ddd;
     font-weight: 300;
     text-align: center;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    white-space: nowrap;
 }
 
 .day-prob {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     color: #ddd;
     font-weight: 800;
     text-align: center;
@@ -144,6 +185,7 @@
         grid-template-columns: repeat(7, 1fr);
         gap: 2px;
         width: 100%;
+        min-width: 0;
     }
 
     .forecast-actions,
@@ -206,20 +248,26 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    min-width: 0;
+    width: 100%;
 }
 
 .day-metrics {
     display: flex;
-    justify-content: space-between;
-    padding: 0 4px;
-    font-size: 0.7rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 0;
+    font-size: 0.65rem;
     color: #666;
     font-family: 'Consolas', 'Monaco', monospace;
+    width: 100%;
 }
 
 .day-metrics span {
     opacity: 0.7;
     transition: color 0.2s, opacity 0.2s;
+    line-height: 1;
 }
 
 .day-metrics span.high {
@@ -234,4 +282,13 @@
 
 .day-card.active+.day-metrics {
     color: #888;
+}
+
+@media (min-width: 1000px) {
+    .day-metrics {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 0 4px;
+        font-size: 0.8rem;
+    }
 }

@@ -1,10 +1,16 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
-import { HEATMAP_PRIOR, MODEL_THRESHOLD, FORECAST_METRICS } from "./ForecastConstants";
+import { MODEL_THRESHOLD, FORECAST_METRICS, DOW_PROBABILITY_SCALES, CALIBRATION } from "./ForecastConstants";
 import "./Forecast.css";
 
-ort.env.wasm.wasmPaths = "./";
+// Use absolute path for WASM to ensureWorker resolution works
+const wasmPath = (typeof window !== 'undefined') ? window.location.origin + '/' : '/';
+ort.env.wasm.wasmPaths = wasmPath;
+ort.env.wasm.proxy = true;
+ort.env.wasm.numThreads = 1; // Basic threading, offload from main
+
+const CHANNEL_ID = "UCmbs8T6MWqUHP1tIQvSgKrg";
 
 interface DayForecast {
     name: string;
@@ -12,12 +18,14 @@ interface DayForecast {
     scheduledProbs: number[];
     maxProb: number;
     highProbCount: number;
+    dow: number;
 }
 
 interface ForecastState {
     status: string;
     days: DayForecast[];
     timezone: string;
+    loading: boolean;
 }
 
 const TIMEZONES = (() => {
@@ -40,192 +48,177 @@ export default class Forecast extends Component<{}, ForecastState> {
         super();
         this.localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         this.state = {
-            status: "Initializing...",
+            status: "Forecasting...",
             days: [],
-            timezone: this.localTimezone
+            timezone: this.localTimezone,
+            loading: true
         };
     }
 
     async componentDidMount() {
         this.mounted = true;
-        try {
-            this.session = await ort.InferenceSession.create("model.onnx", {
-                executionProviders: ["wasm"],
-            });
-            this.updateView();
-        } catch (e) {
-            console.error("Model Load Error:", e);
-            if (this.mounted) this.setState({ status: "Error loading model." });
-        }
+        // Defer heavy initialization to allow initial UI paint
+        setTimeout(async () => {
+            if (!this.mounted) return;
+            try {
+                this.session = await ort.InferenceSession.create("/model_v3.onnx", {
+                    executionProviders: ["wasm"],
+                });
+                await this.updateView();
+            } catch (e) {
+                console.error("Model Load Error:", e);
+                if (this.mounted) this.setState({ status: "Error loading forecast.", loading: false });
+            }
+        }, 100);
     }
 
     componentWillUnmount() {
         this.mounted = false;
     }
 
+    applyCalibration(prob: number, calibMap: number[]) {
+        if (!calibMap || calibMap.length === 0) return prob;
+        const idx = Math.min(100, Math.max(0, Math.floor(prob * 100)));
+        return calibMap[idx];
+    }
+
     updateView = async () => {
         if (!this.session || !this.mounted) return;
 
-        this.setState({ status: "Syncing..." });
+        this.setState({ status: "Asking Holodex nicely...", loading: true });
         let history;
         try {
             history = await getForecastHistory();
         } catch (e) {
             console.error(e);
-            this.setState({ status: "Sync Error." });
+            if (this.mounted) this.setState({ status: "Sync Error.", loading: false });
             return;
         }
 
         if (!history || history.length === 0) {
-            this.setState({ status: "No Data" });
+            if (this.mounted) this.setState({ status: "No Data", loading: false });
             return;
         }
 
-        this.setState({ status: "Processing..." });
+        this.setState({ status: "Scheduling..." });
 
         const scheduled = await getScheduledStreams();
 
-        const lastStream = history[0];
-        const isLive = lastStream.status === "live";
-        const lastStartStr = (lastStream as any).start_actual || (lastStream as any).available_at || lastStream.actualStart || lastStream.availableAt;
-        const lastStart = new Date(lastStartStr);
-
-        let lastEnd: Date;
-        if (isLive) {
-            lastEnd = new Date();
-        } else {
-            const lastEndStr = (lastStream as any).end_actual || lastStartStr;
-            lastEnd = new Date(lastEndStr);
-        }
-
-        let durationHours = (lastEnd.getTime() - lastStart.getTime()) / (1000 * 3600);
-        if (durationHours < 0) durationHours = 0;
-
+        // 1. Preprocess history (match app.js baseHistory)
         const now = new Date();
-        let current = new Date(now);
-        current.setMinutes(0, 0, 0);
-        current.setHours(current.getHours() + 1);
+        const nowMs = now.getTime();
 
-        const inputs: number[] = [];
-        const times: Date[] = [];
+        const baseHistory = history.map((v: any) => ({
+            ...v,
+            start_actual: new Date(v.actualStart || v.start_actual || v.availableAt || v.available_at),
+            end_actual: new Date(v.actualEnd || v.end_actual || v.availableAt || v.available_at),
+            cid: v.channelId || (v.channel ? v.channel.id : null)
+        })).filter(v => v.start_actual.getTime() <= nowMs);
 
-        const wasStreamingAt = (timestamp: Date) => {
-            const tTime = timestamp.getTime();
-            for (let vid of history) {
-                const startStr = (vid as any).start_actual || vid.actualStart;
-                if (!startStr) continue;
-                const start = new Date(startStr).getTime();
-                if (start >= tTime && start < tTime + 3600000) {
-                    return 1.0;
-                }
-            }
-            return 0.0;
+        // Grid Solo/Coll for frequencies
+        const gridSolo = new Set(baseHistory.filter(v => v.cid === CHANNEL_ID).map(v => new Date(v.start_actual).setUTCMinutes(0, 0, 0)));
+
+        const getRollingCount = (grid: Set<number>, t: Date, days: number) => {
+            let count = 0;
+            const window = days * 24 * 3600 * 1000;
+            const nowTime = t.getTime();
+            grid.forEach(h => {
+                const diff = nowTime - h;
+                if (diff > 0 && diff <= window) count++;
+            });
+            return count / days;
         };
 
-        const dowTotalStreams = history.length || 1;
-        const indexToDow = [0, 1, 2, 3, 4, 5, 6];
-        const dowIntensityMap = indexToDow.map(dowIdx => {
-            const count = history.filter(v => {
-                const startStr = (v as any).start_actual || v.actualStart;
-                if (!startStr) return false;
-                return new Date(startStr).getUTCDay() === dowIdx;
-            }).length;
-            return (count / dowTotalStreams) * 0.2;
-        });
+        const inputs: number[][] = [];
+        const times: Date[] = [];
+        let currentHour = new Date(now);
+        currentHour.setUTCMinutes(0, 0, 0);
+        currentHour.setUTCHours(currentHour.getUTCHours() + 1);
 
-        for (let i = 0; i < 200; i++) {
-            const t = new Date(current.getTime() + i * 3600 * 1000);
+        for (let i = 0; i < 168; i++) {
+            if (i % 12 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+
+            const t = new Date(currentHour.getTime() + i * 3600 * 1000);
             times.push(t);
 
             const hour = t.getUTCHours();
-            const dow = t.getUTCDay();
-
+            const dow = (t.getUTCDay() + 6) % 7;
             const hour_sin = Math.sin(2 * Math.PI * hour / 24);
             const hour_cos = Math.cos(2 * Math.PI * hour / 24);
-            const day_sin = Math.sin(2 * Math.PI * dow / 7);
-            const day_cos = Math.cos(2 * Math.PI * dow / 7);
 
-            const hours_since_stream = (t.getTime() - lastEnd.getTime()) / (1000 * 3600);
-            const hours_since_start = (t.getTime() - lastStart.getTime()) / (1000 * 3600);
+            const tTime = t.getTime();
+            const lastAny = baseHistory.find(v => v.end_actual < t);
+            const lastAnyStart = baseHistory.find(v => v.start_actual < t);
+            const lastSolo = baseHistory.find(v => v.cid === CHANNEL_ID && v.end_actual < t);
+            const lastSoloStart = baseHistory.find(v => v.cid === CHANNEL_ID && v.start_actual < t);
+            const lastColl = baseHistory.find(v => v.cid !== CHANNEL_ID && v.end_actual < t);
 
-            const time24 = new Date(t.getTime() - 24 * 3600 * 1000);
-            const time168 = new Date(t.getTime() - 168 * 3600 * 1000);
-            const time336 = new Date(t.getTime() - 14 * 24 * 3600 * 1000);
-            const time504 = new Date(t.getTime() - 21 * 24 * 3600 * 1000);
+            const hrs_since_last_stream = lastAny ? (tTime - lastAny.end_actual.getTime()) / 3600000 : 999;
+            const hrs_since_last_start = lastAnyStart ? (tTime - lastAnyStart.start_actual.getTime()) / 3600000 : 999;
+            const hrs_since_solo = lastSolo ? (tTime - lastSolo.end_actual.getTime()) / 3600000 : 999;
+            const hrs_since_coll = lastColl ? (tTime - lastColl.end_actual.getTime()) / 3600000 : 999;
 
-            const stream_24 = wasStreamingAt(time24);
-            const stream_168 = wasStreamingAt(time168);
-            const stream_336 = wasStreamingAt(time336);
-            const stream_504 = wasStreamingAt(time504);
+            const last_stream_duration = lastAny && lastAnyStart ? (lastAny.end_actual.getTime() - lastAny.start_actual.getTime()) / 3600000 : 0;
+            const last_solo_duration = lastSolo && lastSoloStart ? (lastSolo.end_actual.getTime() - lastSolo.start_actual.getTime()) / 3600000 : 0;
 
-            const rolling_3d = history.filter(v => {
-                const startStr = (v as any).start_actual || v.actualStart;
-                if (!startStr) return false;
-                const d = new Date(startStr).getTime();
-                const diff = t.getTime() - d;
-                return diff > 0 && diff < (3 * 24 * 3600 * 1000);
-            }).length;
+            const s90 = getRollingCount(gridSolo, t, 90);
+            const hourOfWeek = (t.getUTCDay() + 6) % 7 * 24 + t.getUTCHours();
+            const heatmapPrior = 0.0;
+            const dowIntensity = 0.0;
 
-            const rolling_7d = history.filter(v => {
-                const startStr = (v as any).start_actual || v.actualStart;
-                if (!startStr) return false;
-                const d = new Date(startStr).getTime();
-                const diff = t.getTime() - d;
-                return diff > 0 && diff < (7 * 24 * 3600 * 1000);
-            }).length;
+            const is_break = hrs_since_last_stream > 168 ? 1 : 0;
 
-            const rolling_14d = history.filter(v => {
-                const startStr = (v as any).start_actual || v.actualStart;
-                if (!startStr) return false;
-                const d = new Date(startStr).getTime();
-                const diff = t.getTime() - d;
-                return diff > 0 && diff < (14 * 24 * 3600 * 1000);
-            }).length;
-
-            const recentFrequency = rolling_3d / (rolling_14d / 4.6 + 0.1);
-            const dowIntensity = dowIntensityMap[dow];
-
-            const hourIndex = dow * 24 + hour;
-            const heatmapPrior = HEATMAP_PRIOR[hourIndex] || 0;
-
-            const daysSinceLastStream = hours_since_stream / 24.0;
-
-            inputs.push(
-                hour_sin, hour_cos, day_sin, day_cos,
-                hours_since_stream, hours_since_start, durationHours,
-                stream_24, stream_168, stream_336, stream_504,
-                rolling_7d, dowIntensity,
-                recentFrequency, daysSinceLastStream,
-                heatmapPrior
-            );
+            inputs.push([
+                heatmapPrior,               // 0: heatmap_prior
+                hour_cos,                   // 1: hour_cos
+                hour_sin,                   // 2: hour_sin
+                s90,                        // 3: solo_90d_freq
+                hrs_since_solo / 24.0,      // 4: days_since_last_solo 
+                hrs_since_solo,             // 5: hours_since_last_solo
+                hrs_since_last_start,       // 6: hours_since_last_start
+                hrs_since_last_stream,      // 7: hours_since_last_stream
+                last_stream_duration,       // 8: last_stream_duration
+                last_solo_duration,         // 9: last_solo_duration
+                hrs_since_coll,             // 10: hours_since_last_collab
+                dowIntensity,               // 11: dow_intensity
+                dow,                        // 12: day_of_week
+                is_break,                   // 13: is_break
+                hourOfWeek                  // 14: hour_of_week
+            ]);
         }
 
         try {
-            const tensor = new ort.Tensor('float32', Float32Array.from(inputs), [200, 16]);
-            const feeds = { float_input: tensor };
-            const results = await this.session.run(feeds);
+            const flatData = Float32Array.from(inputs.flat());
+            const tensor = new ort.Tensor('float32', flatData, [168, 15]);
+            const results = await this.session.run({ float_input: tensor });
 
             const outputKey = this.session.outputNames[1] || this.session.outputNames[0];
-            const probs = results[outputKey].data as Float32Array;
+            const probs_raw = results[outputKey].data as Float32Array;
 
             const streamProbs: number[] = [];
-            for (let i = 0; i < 200; i++) {
-                streamProbs.push(probs[i * 2 + 1]);
+            const isGateFlattened = probs_raw.length === (168 * 2);
+
+            for (let i = 0; i < 168; i++) {
+                let pg = isGateFlattened ? probs_raw[i * 2 + 1] : probs_raw[i];
+                const dow = (times[i].getUTCDay() + 6) % 7;
+                pg = Math.min(1.0, pg * DOW_PROBABILITY_SCALES[dow]);
+                streamProbs.push(this.applyCalibration(pg, CALIBRATION.gatekeeper || []));
             }
 
             this.processForecast(times, streamProbs, scheduled);
-            if (this.mounted) this.setState({ status: "Ready" });
+            if (this.mounted) this.setState({ status: "Kropium ready.", loading: false });
 
         } catch (e) {
             console.error("Inference Error:", e);
-            if (this.mounted) this.setState({ status: "Prediction Error" });
+            if (this.mounted) this.setState({ status: "Prediction Error", loading: false });
         }
     };
 
     processForecast(times: Date[], probs: number[], scheduled: any[]) {
         const daysMap: Record<string, DayForecast> = {};
         const { timezone } = this.state;
-
         const uniqueDayNames: string[] = [];
 
         times.forEach((t, i) => {
@@ -242,7 +235,6 @@ export default class Forecast extends Component<{}, ForecastState> {
             }).format(t);
             const hourInTz = parseInt(hourInTzStr);
 
-
             if (!daysMap[dayName]) {
                 uniqueDayNames.push(dayName);
                 daysMap[dayName] = {
@@ -250,13 +242,14 @@ export default class Forecast extends Component<{}, ForecastState> {
                     probs: new Array(24).fill(0),
                     scheduledProbs: new Array(24).fill(0),
                     maxProb: 0,
-                    highProbCount: 0
+                    highProbCount: 0,
+                    dow: t.getUTCDay()
                 };
             }
             const p = probs[i];
 
             if (daysMap[dayName].probs[hourInTz] !== undefined) {
-                daysMap[dayName].probs[hourInTz] = p;
+                daysMap[dayName].probs[hourInTz] = Math.max(daysMap[dayName].probs[hourInTz], p);
             }
 
             let schedProb = 0;
@@ -269,7 +262,6 @@ export default class Forecast extends Component<{}, ForecastState> {
 
                     if (now >= start) {
                         const hoursSinceStart = (now - start) / (1000 * 3600);
-
                         if (hoursSinceStart < 1.0) {
                             schedProb = Math.max(schedProb, 0.995);
                         } else {
@@ -281,7 +273,7 @@ export default class Forecast extends Component<{}, ForecastState> {
             }
 
             if (daysMap[dayName].scheduledProbs[hourInTz] !== undefined) {
-                daysMap[dayName].scheduledProbs[hourInTz] = schedProb;
+                daysMap[dayName].scheduledProbs[hourInTz] = Math.max(daysMap[dayName].scheduledProbs[hourInTz], schedProb);
             }
 
             if (p > daysMap[dayName].maxProb) daysMap[dayName].maxProb = p;
@@ -290,8 +282,7 @@ export default class Forecast extends Component<{}, ForecastState> {
         });
 
         const finalDays = uniqueDayNames.slice(0, 7).map(name => daysMap[name]);
-
-        this.setState({ days: finalDays });
+        if (this.mounted) this.setState({ days: finalDays });
     }
 
     renderSparkline(probs: number[], scheduledProbs: number[], nowX: number | null = null) {
@@ -358,7 +349,7 @@ export default class Forecast extends Component<{}, ForecastState> {
     }
 
     render() {
-        const { days, timezone } = this.state;
+        const { days, timezone, status, loading } = this.state;
 
         const now = new Date();
         const todayName = now.toLocaleDateString('en-US', {
@@ -374,25 +365,28 @@ export default class Forecast extends Component<{}, ForecastState> {
         const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
         const currentX = ((h + m / 60) / 23) * 100;
 
-
         return (
             <div class="forecast-section">
                 <div class="forecast-controls-bar">
                     <h3 class="forecast-header serif">7-DAY KRONIIUM FORECAST</h3>
+                    <div class="status-indicator">
+                        {loading && <div class="spinner-small"></div>}
+                        <span class="status-text">{status}</span>
+                    </div>
                     <div class="forecast-actions">
                         <select class="timezone-select" value={timezone} onChange={this.handleTimezoneChange}>
                             <option value={this.localTimezone}>Local ({this.localTimezone})</option>
                             {TIMEZONES.map(tz => <option value={tz.value}>{tz.label}</option>)}
                         </select>
-                        <button class="icon-btn material-icons" onClick={this.updateView} title="Refresh">refresh</button>
+                        <button class="icon-btn material-icons" onClick={this.updateView} title="Refresh" disabled={loading}>refresh</button>
                     </div>
                 </div>
 
-                <div class="forecast-grid">
-                    {days.map((day, index) => {
+                <div class={`forecast-grid ${loading ? 'grid-loading' : ''}`}>
+                    {days.map((day) => {
                         const isActive = day.maxProb >= MODEL_THRESHOLD;
                         const isToday = day.name === todayName;
-                        const metrics = FORECAST_METRICS[index] || { recall: 0, precision: 0, f1: 0 };
+                        const metrics = FORECAST_METRICS[day.dow] || { recall: 0, precision: 0, f1: 0 };
 
                         const getMetricClass = (val: number, threshold: number) => {
                             if (val === 0) return 'zero';
@@ -412,9 +406,9 @@ export default class Forecast extends Component<{}, ForecastState> {
                                         {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
                                     </div>
                                 </div>
-                                <div class="day-metrics" title={`Recall: ${metrics.recall}%, Precision: ${metrics.precision}%, F1: ${metrics.f1}`}>
-                                    <span class={getMetricClass(metrics.recall, 50)}>R:{metrics.recall.toFixed(0)}</span>
-                                    <span class={getMetricClass(metrics.precision, 50)}>P:{metrics.precision.toFixed(0)}</span>
+                                <div class="day-metrics" title={`Recall: ${(metrics.recall * 100).toFixed(0)}%, Precision: ${(metrics.precision * 100).toFixed(0)}%, F1: ${metrics.f1.toFixed(2)}`}>
+                                    <span class={getMetricClass(metrics.recall, 0.5)}>R:{(metrics.recall * 100).toFixed(0)}</span>
+                                    <span class={getMetricClass(metrics.precision, 0.5)}>P:{(metrics.precision * 100).toFixed(0)}</span>
                                     <span class={getMetricClass(metrics.f1, 0.5)}>F1:{metrics.f1.toFixed(2)}</span>
                                 </div>
                             </div>
