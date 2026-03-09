@@ -1,5 +1,6 @@
 #app {
-  max-width: 1280px;
+  width: 100%;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
@@ -7,10 +8,11 @@
 
 button.mdc-button {
   color: #77f !important;
+  text-transform: none !important;
 }
 
 button.mdc-button.mdc-button--raised {
-  padding: 1em 2.2em !important;
+  padding: 1.5rem 2.2em !important;
   font-size: 1.2em !important;
   background-color: #23274b !important;
   color: #ddd !important;
@@ -82,9 +84,13 @@ input {
 
 #logo {
   display: block;
-  width: 80%;
+  width: 50%;
   margin: 0;
-  padding-left: 20%;
+  padding-left: 31%;
+}
+
+#titleheading {
+  margin-top: 1rem;
 }
 
 #sharepfp {

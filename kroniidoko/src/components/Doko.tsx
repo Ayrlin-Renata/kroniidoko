@@ -1,11 +1,13 @@
 import { Component } from "preact";
-import { getKrData } from "../utils";
+import { getAllData } from "../utils";
 import TimeSinceKronii from "./TimeSinceKronii";
 import Forecast from "./Forecast";
+import StreamCard from "./StreamCard";
 
 type DParams = {
     next: Boolean;
     hideForecast?: Boolean;
+    hideSince?: Boolean;
 }
 type DState = {
     loading: Boolean,
@@ -18,7 +20,10 @@ type DState = {
         krnexttitle: String,
         krnextdate: Date,
         krnextid: String
-    }
+    },
+    activeStream: any | null,
+    tailX: number | null,
+    history: any[] | null
 }
 export default class Doko extends Component<DParams, DState> {
 
@@ -35,29 +40,56 @@ export default class Doko extends Component<DParams, DState> {
                 krnexttitle: "",
                 krnextdate: new Date(),
                 krnextid: ""
-            }
+            },
+            activeStream: null,
+            tailX: null,
+            history: null
         }
     }
 
     componentDidMount(): void {
-        getKrData().then(res => this.setState({
-            loading: false,
-            data: {
-                live: res.live,
-                krlastdate: res.krlastdate,
-                krlasttitle: res.krlasttitle,
-                krlastid: res.krlastid,
-                krnext: res.krnext,
-                krnexttitle: res.krnexttitle,
-                krnextdate: res.krnextdate,
-                krnextid: res.krnextid
+        getAllData().then(res => {
+            if (this.mounted) {
+                this.setState({
+                    loading: false,
+                    history: res.history,
+                    data: {
+                        live: res.live,
+                        krlastdate: res.krlastdate,
+                        krlasttitle: res.krlasttitle,
+                        krlastid: res.krlastid,
+                        krnext: res.krnext,
+                        krnexttitle: res.krnexttitle,
+                        krnextdate: res.krnextdate,
+                        krnextid: res.krnextid
+                    }
+                }, () => {
+                    if (this.state.data.krnext) {
+                        const nextS = {
+                            title: this.state.data.krnexttitle,
+                            scheduledStart: this.state.data.krnextdate,
+                            id: this.state.data.krnextid
+                        };
+                        this.setState({ activeStream: nextS });
+                    }
+                });
             }
-        }));
+        });
+    }
+
+    mounted = true;
+    componentWillUnmount() {
+        this.mounted = false;
+    }
+
+    handleSelectStream = (stream: any, tailX: number) => {
+        this.setState({ activeStream: stream, tailX });
     }
 
     render(params: DParams) {
         const { loading, data } = this.state;
         const showForecast = !params.hideForecast;
+        const showSince = !params.hideSince;
 
         if (loading) {
             return (
@@ -74,7 +106,7 @@ export default class Doko extends Component<DParams, DState> {
                 <>
                     <h2 class="serif">KRONII KOKO!!!</h2>
                     <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
-                    {showForecast && <Forecast />}
+                    {showForecast && <Forecast onSelectStream={this.handleSelectStream} initialHistory={this.state.history} />}
                 </>
             );
         }
@@ -87,42 +119,43 @@ export default class Doko extends Component<DParams, DState> {
                     </div>
                 </div>
 
-                <div class="doko-section" id="laststream">
-                    <h3 class="serif section-header">NO KRONIIUM SINCE</h3>
-                    <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
-                        <div class={`info-card-box ${!showForecast ? 'transparent' : ''}`}>
-                            <h2 class="date-display">{krlastdatetimestr}</h2>
+                {showSince && (
+                    <div class="doko-section" id="laststream">
+                        <h3 class="serif section-header">NO KRONIIUM SINCE</h3>
+                        <div style={{ display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center' }}>
+                            <div class={`info-card-box ${!showForecast ? 'transparent' : ''}`}>
+                                <h2 class="date-display">{krlastdatetimestr}</h2>
+                            </div>
                         </div>
                         {showForecast && data.krlasttitle && (
-                            <div class="last-seen-container">
-                                <h3 class="serif">LAST SEEN AT</h3>
-                                <h3 class="serif">
-                                    <a href={"https://youtube.com/watch?v=" + data.krlastid}>{data.krlasttitle}</a>
-                                </h3>
-                            </div>
+                            <h3 class="serif">
+                                AT <a href={"https://youtube.com/watch?v=" + data.krlastid}>{data.krlasttitle}</a>
+                            </h3>
                         )}
                     </div>
-                </div>
+                )}
                 {
                     (params.next) ?
-                        (data.krnext) ?
+                        (this.state.activeStream || data.krnext) ?
                             (
-                                <>
-                                    <h3 class="serif">NEXT SCHEDULED STREAM</h3>
-                                    <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
-                                    <h3>{"at " + krnextdatetimestr}</h3>
-                                </>
+                                <StreamCard
+                                    title={this.state.activeStream ? this.state.activeStream.title : data.krnexttitle}
+                                    id={this.state.activeStream ? this.state.activeStream.id : data.krnextid}
+                                    dateStr={this.state.activeStream
+                                        ? new Date(this.state.activeStream.scheduledStart || this.state.activeStream.availableAt).toLocaleString()
+                                        : krnextdatetimestr}
+                                    tailX={this.state.tailX || undefined}
+                                />
                             ) : (
                                 <div class="no-stream-msg">
                                     <h3 class="serif">NO NEXT STREAM CURRENTLY SCHEDULED</h3>
-                                    <p class="lowtext">according to the holodex API...</p>
+                                    <p class="lowtext">according to holodex...</p>
                                 </div>
                             )
                         : (<></>)
                 }
-                {showForecast && <Forecast />}
+                {showForecast && <Forecast onSelectStream={this.handleSelectStream} initialHistory={this.state.history} />}
             </>
         );
     }
-
 }

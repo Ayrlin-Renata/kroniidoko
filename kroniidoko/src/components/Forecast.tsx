@@ -39,8 +39,14 @@ const TIMEZONES = (() => {
     return zones;
 })();
 
-export default class Forecast extends Component<{}, ForecastState> {
+interface ForecastProps {
+    onSelectStream?: (stream: any, tailX: number) => void;
+    initialHistory?: any[] | null;
+}
+
+export default class Forecast extends Component<ForecastProps, ForecastState> {
     session: ort.InferenceSession | null = null;
+    scheduledStreams: any[] = [];
     mounted = false;
     localTimezone: string;
 
@@ -86,13 +92,16 @@ export default class Forecast extends Component<{}, ForecastState> {
         if (!this.session || !this.mounted) return;
 
         this.setState({ status: "Asking Holodex nicely...", loading: true });
-        let history;
-        try {
-            history = await getForecastHistory();
-        } catch (e) {
-            console.error(e);
-            if (this.mounted) this.setState({ status: "Sync Error.", loading: false });
-            return;
+        let history = this.props.initialHistory;
+
+        if (!history) {
+            try {
+                history = await getForecastHistory();
+            } catch (e) {
+                console.error(e);
+                if (this.mounted) this.setState({ status: "Sync Error.", loading: false });
+                return;
+            }
         }
 
         if (!history || history.length === 0) {
@@ -207,6 +216,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                 streamProbs.push(this.applyCalibration(pg, CALIBRATION.gatekeeper || []));
             }
 
+            this.scheduledStreams = scheduled;
             this.processForecast(times, streamProbs, scheduled);
             if (this.mounted) this.setState({ status: "Kropium ready.", loading: false });
 
@@ -348,6 +358,75 @@ export default class Forecast extends Component<{}, ForecastState> {
         });
     }
 
+    handleGridClick = (e: MouseEvent, day: DayForecast) => {
+        if (!this.props.onSelectStream || !this.scheduledStreams.length) return;
+
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percent = (x / rect.width);
+
+        // Find hour in timezone
+        const hour = percent * 23;
+
+        // Find the absolute time corresponding to this click
+        // Find the closest scheduled stream in this day.
+
+        const dayStreams = this.scheduledStreams.filter(s => {
+            const start = new Date(s.scheduledStart || s.availableAt);
+            const sName = start.toLocaleDateString('en-US', {
+                weekday: 'short',
+                day: 'numeric',
+                timeZone: this.state.timezone
+            });
+            return sName === day.name;
+        });
+
+        if (dayStreams.length === 0) return;
+
+        // Find closest stream by hour
+        let closestS = dayStreams[0];
+        let minDist = 24;
+
+        dayStreams.forEach(s => {
+            const start = new Date(s.scheduledStart || s.availableAt);
+            const sHourStr = new Intl.DateTimeFormat('en-US', {
+                hour: 'numeric',
+                hourCycle: 'h23',
+                timeZone: this.state.timezone
+            }).format(start);
+            const sHour = parseInt(sHourStr);
+            const dist = Math.abs(sHour - hour);
+            if (dist < minDist) {
+                minDist = dist;
+                closestS = s;
+            }
+        });
+
+        // Calculate tail position for the StreamCard
+        // We need to know which index this day is in the 7-day grid (0-6)
+        const dayIndex = this.state.days.indexOf(day);
+        if (dayIndex === -1) return;
+
+        // Total width of grid is 100%. Each day is 1/7th.
+        // The tail should be at: (dayIndex / 7 * 100) + (percent * (1/7) * 100)
+        // Except we use individual cards, so maybe Doko handles the global positioning.
+        // Let's pass the relative percentage and day index.
+
+        const start = new Date(closestS.scheduledStart || closestS.availableAt);
+        const sHourStr = new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric',
+            hourCycle: 'h23',
+            timeZone: this.state.timezone
+        }).format(start);
+        const sHour = parseInt(sHourStr);
+        const sMinute = start.getUTCMinutes();
+        const streamPercent = (sHour + sMinute / 60) / 23;
+
+        const globalTailX = (dayIndex + streamPercent) / 7 * 100;
+
+        this.props.onSelectStream(closestS, globalTailX);
+    }
+
     render() {
         const { days, timezone, status, loading } = this.state;
 
@@ -395,7 +474,7 @@ export default class Forecast extends Component<{}, ForecastState> {
                         };
 
                         return (
-                            <div class="day-container">
+                            <div class="day-container" onClick={(e) => this.handleGridClick(e, day)}>
                                 <div class={`day-card ${isActive ? 'active' : ''}`}>
                                     <span class="day-header">{day.name}</span>
                                     <span class={`material-icons day-icon ${isActive ? 'active' : 'inactive'}`}>

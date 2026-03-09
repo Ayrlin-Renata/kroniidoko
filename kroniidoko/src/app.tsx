@@ -12,6 +12,7 @@ import DokoShare from './components/DokoShare'
 export function App() {
   const params = new URLSearchParams(window.location.search);
   const hideForecast = params.has('no_forecast') || params.get('forecast') === '0' || params.get('forecast') === 'false';
+  const hideSince = params.has('no_since') || params.get('since') === '0' || params.get('since') === 'false';
 
   return (
     <>
@@ -20,7 +21,7 @@ export function App() {
         <h1 id="titleheading" class="serif">kronii doko?</h1>
       </div>
       <div class="card">
-        <Doko next={true} hideForecast={hideForecast} />
+        <Doko next={true} hideForecast={hideForecast} hideSince={hideSince} />
       </div>
       <br />
       <br />

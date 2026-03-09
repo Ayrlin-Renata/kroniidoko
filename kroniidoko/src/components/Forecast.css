@@ -107,6 +107,19 @@
     pointer-events: none;
 }
 
+.day-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    width: 100%;
+    cursor: pointer;
+}
+
+.day-container:hover .day-card {
+    border: 1px solid rgba(119, 119, 255, 0.4);
+}
+
 .day-card {
     background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(32, 32, 53, 0.95));
     border: none;
@@ -205,6 +218,10 @@
         font-size: 0.8rem;
         text-align: center;
         width: 100%;
+    }
+
+    .status-indicator {
+        display: none;
     }
 
     .day-card {

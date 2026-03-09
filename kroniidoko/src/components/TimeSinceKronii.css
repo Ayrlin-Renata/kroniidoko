@@ -54,6 +54,8 @@
 .date-display {
     font-size: 2rem;
     font-weight: 100;
+    margin-bottom: 0.2rem;
+    margin-top: 0.2rem;
 }
 
 #laststream {

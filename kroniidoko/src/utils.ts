@@ -239,38 +239,58 @@ async function getPastStream(client: HolodexApiClient) {
 }
 
 export async function getScheduledStreams() {
-    const videos = await fetchLiveAndUpcoming();
-    return videos;
+    return await fetchLiveAndUpcoming();
 }
 
+let historyPromise: Promise<Video[]> | null = null;
+let historyTimestamp = 0;
+
 export async function getForecastHistory(): Promise<Video[]> {
-    const client = await getClient();
-    const params = {
-        type: ["stream"],
-        status: ["live", "past"],
-        include: [],
-        limit: 100,
-        order: 'desc'
-    } as any;
-
-    try {
-        const [direct, mentions] = await Promise.all([
-            client.getVideos({ ...params, channel_id: THEME_CACHE.CHANNEL_ID }),
-            client.getVideos({ ...params, mentioned_channel_id: THEME_CACHE.CHANNEL_ID })
-        ]);
-
-        const all = [...direct, ...mentions];
-        const unique = Array.from(new Map(all.map(v => [v.videoId, v])).values());
-
-        unique.sort((a, b) => {
-            const timeA = new Date(a.actualStart || a.availableAt || 0).getTime();
-            const timeB = new Date(b.actualStart || b.availableAt || 0).getTime();
-            return timeB - timeA;
-        });
-
-        return unique.slice(0, 100);
-    } catch (e) {
-        console.error("Failed to fetch forecast history", e);
-        return [];
+    if (historyPromise && (Date.now() - historyTimestamp < 60000)) {
+        return historyPromise;
     }
+
+    historyTimestamp = Date.now();
+    historyPromise = (async () => {
+        const client = await getClient();
+        const params = {
+            type: ["stream"],
+            status: ["live", "past"],
+            include: [],
+            limit: 100,
+            order: 'desc'
+        } as any;
+
+        try {
+            const [direct, mentions] = await Promise.all([
+                client.getVideos({ ...params, channel_id: THEME_CACHE.CHANNEL_ID }),
+                client.getVideos({ ...params, mentioned_channel_id: THEME_CACHE.CHANNEL_ID })
+            ]);
+
+            const all = [...direct, ...mentions];
+            const unique = Array.from(new Map(all.map(v => [v.videoId, v])).values());
+
+            unique.sort((a, b) => {
+                const timeA = new Date(a.actualStart || a.availableAt || 0).getTime();
+                const timeB = new Date(b.actualStart || b.availableAt || 0).getTime();
+                return timeB - timeA;
+            });
+
+            return unique.slice(0, 100);
+        } catch (e) {
+            console.error("Failed to fetch forecast history", e);
+            historyTimestamp = 0; // Reset on failure
+            return [];
+        }
+    })();
+
+    return historyPromise;
+}
+
+export async function getAllData() {
+    const [krData, history] = await Promise.all([
+        getKrData(),
+        getForecastHistory()
+    ]);
+    return { ...krData, history };
 }
