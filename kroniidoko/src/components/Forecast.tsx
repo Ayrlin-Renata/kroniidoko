@@ -457,7 +457,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                             <option value={this.localTimezone}>Local ({this.localTimezone})</option>
                             {TIMEZONES.map(tz => <option value={tz.value}>{tz.label}</option>)}
                         </select>
-                        <button class="icon-btn material-icons" onClick={this.updateView} title="Refresh" disabled={loading}>refresh</button>
+                        <button class="icon-btn material-symbols-outlined" onClick={this.updateView} title="Refresh" disabled={loading}>refresh</button>
                     </div>
                 </div>
 
@@ -477,9 +477,15 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                             <div class="day-container" onClick={(e) => this.handleGridClick(e, day)}>
                                 <div class={`day-card ${isActive ? 'active' : ''}`}>
                                     <span class="day-header">{day.name}</span>
-                                    <span class={`material-icons day-icon ${isActive ? 'active' : 'inactive'}`}>
-                                        {isActive ? 'alarm_on' : 'alarm_off'}
-                                    </span>
+                                    <div class="icon-stack">
+                                        <span class={`material-symbols-outlined day-icon front-icon ${isActive ? 'active' : 'inactive'}`}>
+                                            {isActive ? 'alarm_on' : 'alarm_off'}
+                                        </span>
+                                        <div class="icon-occlusion"></div>
+                                        <span class={`material-symbols-outlined day-icon back-icon ${isActive ? 'active' : 'inactive'}`}>
+                                            {isActive ? 'battery_charging_20' : 'drag_indicator'}
+                                        </span>
+                                    </div>
                                     <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
                                     <div class="sparkline-container">
                                         {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
