@@ -138,7 +138,6 @@ async function fetchLiveAndUpcoming(): Promise<Video[]> {
             const { data } = await client.httpClient.get(`/users/live?channels=${THEME_CACHE.CHANNEL_ID}&includePlaceholder=true`);
             const videos = data.map((v: any) => new Video(v));
 
-            // Ensure sorting just in case API doesnt
             videos.sort((a: Video, b: Video) => {
                 const dA = new Date(a.scheduledStart || a.availableAt || 0).getTime();
                 const dB = new Date(b.scheduledStart || b.availableAt || 0).getTime();
@@ -256,7 +255,7 @@ export async function getForecastHistory(): Promise<Video[]> {
         const params = {
             type: ["stream"],
             status: ["live", "past"],
-            include: [],
+            include: ["live_info"],
             limit: 100,
             order: 'desc'
         } as any;
@@ -276,10 +275,10 @@ export async function getForecastHistory(): Promise<Video[]> {
                 return timeB - timeA;
             });
 
-            return unique.slice(0, 100);
+            return unique;
         } catch (e) {
             console.error("Failed to fetch forecast history", e);
-            historyTimestamp = 0; // Reset on failure
+            historyTimestamp = 0;
             return [];
         }
     })();

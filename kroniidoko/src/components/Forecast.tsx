@@ -1,20 +1,21 @@
 import { Component } from "preact";
 import * as ort from "onnxruntime-web";
 import { getForecastHistory, getScheduledStreams } from "../utils";
-import { MODEL_THRESHOLD, FORECAST_METRICS, DOW_PROBABILITY_SCALES, CALIBRATION } from "./ForecastConstants";
+import { MODEL_THRESHOLD, FORECAST_METRICS, DOW_PROBABILITY_SCALES, CALIBRATION, HEATMAP_PRIOR_DICT, SHARPNESS, DOW_PRIORS_DICT, HORIZON_METRICS } from "./ForecastConstants";
 import "./Forecast.css";
 
-// Use absolute path for WASM to ensureWorker resolution works
 const wasmPath = (typeof window !== 'undefined') ? window.location.origin + '/' : '/';
 ort.env.wasm.wasmPaths = wasmPath;
 ort.env.wasm.proxy = true;
-ort.env.wasm.numThreads = 1; // Basic threading, offload from main
+ort.env.wasm.numThreads = 1;
 
 const CHANNEL_ID = "UCmbs8T6MWqUHP1tIQvSgKrg";
 
 interface DayForecast {
     name: string;
+    timestamp: Date;
     probs: number[];
+    heatmapProbs: number[];
     scheduledProbs: number[];
     maxProb: number;
     highProbCount: number;
@@ -63,7 +64,6 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
     async componentDidMount() {
         this.mounted = true;
-        // Defer heavy initialization to allow initial UI paint
         setTimeout(async () => {
             if (!this.mounted) return;
             try {
@@ -113,19 +113,38 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
         const scheduled = await getScheduledStreams();
 
-        // 1. Preprocess history (match app.js baseHistory)
         const now = new Date();
         const nowMs = now.getTime();
 
-        const baseHistory = history.map((v: any) => ({
-            ...v,
-            start_actual: new Date(v.actualStart || v.start_actual || v.availableAt || v.available_at),
-            end_actual: new Date(v.actualEnd || v.end_actual || v.availableAt || v.available_at),
-            cid: v.channelId || (v.channel ? v.channel.id : null)
-        })).filter(v => v.start_actual.getTime() <= nowMs);
+        const baseHistory = history.map((v: any) => {
+            const cid = v.channelId || v.channel?.id || v.channel_id || v.author?.id || (typeof v.channel === 'string' ? v.channel : null);
+            return {
+                ...v,
+                start_actual: new Date(v.actualStart || v.start_actual || v.availableAt || v.available_at),
+                end_actual: new Date(v.actualEnd || v.end_actual || v.availableAt || v.available_at),
+                cid: cid
+            };
+        }).filter(v => v.start_actual.getTime() <= nowMs && v.type !== 'placeholder')
+            .sort((a, b) => b.start_actual.getTime() - a.start_actual.getTime())
+            .slice(0, 100);
 
-        // Grid Solo/Coll for frequencies
-        const gridSolo = new Set(baseHistory.filter(v => v.cid === CHANNEL_ID).map(v => new Date(v.start_actual).setUTCMinutes(0, 0, 0)));
+        const gridSolo = new Set(baseHistory.filter((v: any) => v.cid === CHANNEL_ID).map((v: any) => {
+            const d = new Date(v.start_actual);
+            d.setUTCMinutes(0, 0, 0);
+            d.setUTCMilliseconds(0);
+            return d.getTime();
+        }));
+
+        const solos = baseHistory.filter(v => v.cid === CHANNEL_ID);
+        console.log(`[V3 Debug] baseHistory count: ${baseHistory.length}, solos: ${solos.length}`);
+
+        if (baseHistory.length > 0) {
+            console.log(`[V3 Debug] Sample Video [0]:`, {
+                title: baseHistory[0].title,
+                cid: baseHistory[0].cid,
+                isSolo: baseHistory[0].cid === CHANNEL_ID
+            });
+        }
 
         const getRollingCount = (grid: Set<number>, t: Date, days: number) => {
             let count = 0;
@@ -152,32 +171,30 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
             const t = new Date(currentHour.getTime() + i * 3600 * 1000);
             times.push(t);
 
-            const hour = t.getUTCHours();
-            const dow = (t.getUTCDay() + 6) % 7;
-            const hour_sin = Math.sin(2 * Math.PI * hour / 24);
-            const hour_cos = Math.cos(2 * Math.PI * hour / 24);
+            const hour_sin = Math.sin(2 * Math.PI * t.getUTCHours() / 24);
+            const hour_cos = Math.cos(2 * Math.PI * t.getUTCHours() / 24);
 
             const tTime = t.getTime();
-            const lastAny = baseHistory.find(v => v.end_actual < t);
-            const lastAnyStart = baseHistory.find(v => v.start_actual < t);
-            const lastSolo = baseHistory.find(v => v.cid === CHANNEL_ID && v.end_actual < t);
-            const lastSoloStart = baseHistory.find(v => v.cid === CHANNEL_ID && v.start_actual < t);
-            const lastColl = baseHistory.find(v => v.cid !== CHANNEL_ID && v.end_actual < t);
+            const lastAny = baseHistory.find(v => v.end_actual.getTime() < tTime);
+            const lastAnyStart = baseHistory.find(v => v.start_actual.getTime() < tTime);
+            const lastSolo = baseHistory.find(v => v.cid === CHANNEL_ID && v.end_actual.getTime() < tTime);
+            const lastColl = baseHistory.find(v => v.cid !== CHANNEL_ID && v.end_actual.getTime() < tTime);
 
             const hrs_since_last_stream = lastAny ? (tTime - lastAny.end_actual.getTime()) / 3600000 : 999;
             const hrs_since_last_start = lastAnyStart ? (tTime - lastAnyStart.start_actual.getTime()) / 3600000 : 999;
             const hrs_since_solo = lastSolo ? (tTime - lastSolo.end_actual.getTime()) / 3600000 : 999;
             const hrs_since_coll = lastColl ? (tTime - lastColl.end_actual.getTime()) / 3600000 : 999;
 
-            const last_stream_duration = lastAny && lastAnyStart ? (lastAny.end_actual.getTime() - lastAny.start_actual.getTime()) / 3600000 : 0;
-            const last_solo_duration = lastSolo && lastSoloStart ? (lastSolo.end_actual.getTime() - lastSolo.start_actual.getTime()) / 3600000 : 0;
+            const last_stream_duration = lastAny ? (lastAny.end_actual.getTime() - lastAny.start_actual.getTime()) / 3600000 : 0;
+            const last_solo_duration = lastSolo ? (lastSolo.end_actual.getTime() - lastSolo.start_actual.getTime()) / 3600000 : 0;
 
             const s90 = getRollingCount(gridSolo, t, 90);
-            const hourOfWeek = (t.getUTCDay() + 6) % 7 * 24 + t.getUTCHours();
-            const heatmapPrior = 0.0;
-            const dowIntensity = 0.0;
+            const dowOfT = (t.getUTCDay() + 6) % 7;
+            const hourOfT = t.getUTCHours();
+            const hourOfWeek = dowOfT * 24 + hourOfT;
 
-            const is_break = hrs_since_last_stream > 168 ? 1 : 0;
+            const heatmapPrior = HEATMAP_PRIOR_DICT[hourOfWeek.toFixed(1)] || 0.0;
+            const dowIntensity = DOW_PRIORS_DICT[dowOfT.toFixed(1)] || 0.0;
 
             inputs.push([
                 heatmapPrior,               // 0: heatmap_prior
@@ -192,28 +209,41 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                 last_solo_duration,         // 9: last_solo_duration
                 hrs_since_coll,             // 10: hours_since_last_collab
                 dowIntensity,               // 11: dow_intensity
-                dow,                        // 12: day_of_week
-                is_break,                   // 13: is_break
-                hourOfWeek                  // 14: hour_of_week
+                i                           // 12: horizon_hrs (forecast lag)
             ]);
         }
 
         try {
             const flatData = Float32Array.from(inputs.flat());
-            const tensor = new ort.Tensor('float32', flatData, [168, 15]);
+            const tensor = new ort.Tensor('float32', flatData, [168, 13]);
             const results = await this.session.run({ float_input: tensor });
 
-            const outputKey = this.session.outputNames[1] || this.session.outputNames[0];
-            const probs_raw = results[outputKey].data as Float32Array;
+            const probName = this.session.outputNames.find(n => n.toLowerCase().includes('prob'))
+                || this.session.outputNames[1]
+                || this.session.outputNames[0];
+
+            const probs_raw = results[probName].data as Float32Array;
 
             const streamProbs: number[] = [];
-            const isGateFlattened = probs_raw.length === (168 * 2);
+            const isGateFlattened = (probs_raw.length === (168 * 2));
+
+            if (isGateFlattened === false && probs_raw.length === 168) {
+                console.warn("[V3 Debug] Probability array length 168. Model might be returning only positive class or labels.");
+            }
 
             for (let i = 0; i < 168; i++) {
                 let pg = isGateFlattened ? probs_raw[i * 2 + 1] : probs_raw[i];
+
+                // Temperature Scaling (Sharpness)
+                if ((SHARPNESS as number) !== 1.0) {
+                    pg = Math.pow(pg, SHARPNESS) / (Math.pow(pg, SHARPNESS) + Math.pow(1.0 - pg, SHARPNESS) + 1e-9);
+                }
+
                 const dow = (times[i].getUTCDay() + 6) % 7;
                 pg = Math.min(1.0, pg * DOW_PROBABILITY_SCALES[dow]);
-                streamProbs.push(this.applyCalibration(pg, CALIBRATION.gatekeeper || []));
+                const calibratedProb = this.applyCalibration(pg, CALIBRATION.gatekeeper || []);
+
+                streamProbs.push(calibratedProb);
             }
 
             this.scheduledStreams = scheduled;
@@ -224,7 +254,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
             console.error("Inference Error:", e);
             if (this.mounted) this.setState({ status: "Prediction Error", loading: false });
         }
-    };
+    }
 
     processForecast(times: Date[], probs: number[], scheduled: any[]) {
         const daysMap: Record<string, DayForecast> = {};
@@ -249,17 +279,24 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                 uniqueDayNames.push(dayName);
                 daysMap[dayName] = {
                     name: dayName,
+                    timestamp: t,
                     probs: new Array(24).fill(0),
+                    heatmapProbs: new Array(24).fill(0),
                     scheduledProbs: new Array(24).fill(0),
                     maxProb: 0,
                     highProbCount: 0,
-                    dow: t.getUTCDay()
+                    dow: (t.getUTCDay() + 6) % 7
                 };
             }
             const p = probs[i];
+            const dowOfT = (t.getUTCDay() + 6) % 7;
+            const hourOfT = t.getUTCHours();
+            const hourOfWeek = dowOfT * 24 + hourOfT;
+            const heatmapProb = HEATMAP_PRIOR_DICT[hourOfWeek.toFixed(1)] || 0;
 
             if (daysMap[dayName].probs[hourInTz] !== undefined) {
                 daysMap[dayName].probs[hourInTz] = Math.max(daysMap[dayName].probs[hourInTz], p);
+                daysMap[dayName].heatmapProbs[hourInTz] = Math.max(daysMap[dayName].heatmapProbs[hourInTz], heatmapProb);
             }
 
             let schedProb = 0;
@@ -288,6 +325,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
             if (p > daysMap[dayName].maxProb) daysMap[dayName].maxProb = p;
             if (schedProb > daysMap[dayName].maxProb) daysMap[dayName].maxProb = schedProb;
+
             if (p >= MODEL_THRESHOLD || schedProb >= MODEL_THRESHOLD) daysMap[dayName].highProbCount++;
         });
 
@@ -295,7 +333,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
         if (this.mounted) this.setState({ days: finalDays });
     }
 
-    renderSparkline(probs: number[], scheduledProbs: number[], nowX: number | null = null) {
+    renderSparkline(probs: number[], scheduledProbs: number[], heatmapProbs: number[], nowX: number | null = null) {
         const getPoints = (data: number[]) => data.map((p, i) => {
             const x = (i / 23) * 100;
             const val = Math.max(0, Math.min(1, p));
@@ -305,6 +343,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
         const mlPoints = getPoints(probs);
         const schedPoints = getPoints(scheduledProbs);
+        const heatPoints = getPoints(heatmapProbs);
 
         const mlLine = `M ${mlPoints.join(' L ')}`;
         const mlFill = `M 0,100 L ${mlPoints.join(' L ')} L 100,100 Z`;
@@ -312,10 +351,13 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
         const schedLine = `M ${schedPoints.join(' L ')}`;
         const schedFill = `M 0,100 L ${schedPoints.join(' L ')} L 100,100 Z`;
 
+        const heatFill = `M 0,100 L ${heatPoints.join(' L ')} L 100,100 Z`;
+
         const hasSched = scheduledProbs.some(p => p > 0.1);
 
         return (
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%; height:100%; overflow: visible;">
+                <path d={heatFill} fill="rgba(128, 128, 128, 0.3)" stroke="none" />
                 {hasSched && (
                     <>
                         <path d={schedFill} fill="rgba(33, 150, 243, 0.2)" stroke="none" />
@@ -365,11 +407,8 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
         const x = e.clientX - rect.left;
         const percent = (x / rect.width);
 
-        // Find hour in timezone
+        //timezone
         const hour = percent * 23;
-
-        // Find the absolute time corresponding to this click
-        // Find the closest scheduled stream in this day.
 
         const dayStreams = this.scheduledStreams.filter(s => {
             const start = new Date(s.scheduledStart || s.availableAt);
@@ -383,7 +422,6 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
         if (dayStreams.length === 0) return;
 
-        // Find closest stream by hour
         let closestS = dayStreams[0];
         let minDist = 24;
 
@@ -402,15 +440,9 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
             }
         });
 
-        // Calculate tail position for the StreamCard
-        // We need to know which index this day is in the 7-day grid (0-6)
+        // streamcard tail
         const dayIndex = this.state.days.indexOf(day);
         if (dayIndex === -1) return;
-
-        // Total width of grid is 100%. Each day is 1/7th.
-        // The tail should be at: (dayIndex / 7 * 100) + (percent * (1/7) * 100)
-        // Except we use individual cards, so maybe Doko handles the global positioning.
-        // Let's pass the relative percentage and day index.
 
         const start = new Date(closestS.scheduledStart || closestS.availableAt);
         const sHourStr = new Intl.DateTimeFormat('en-US', {
@@ -465,7 +497,20 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                     {days.map((day) => {
                         const isActive = day.maxProb >= MODEL_THRESHOLD;
                         const isToday = day.name === todayName;
-                        const metrics = FORECAST_METRICS[day.dow] || { recall: 0, precision: 0, f1: 0 };
+
+                        // metrics
+                        const diffMs = day.timestamp.getTime() - now.getTime();
+                        const daysOut = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+                        const horizonIdx = Math.min(daysOut, 7);
+
+                        const dStat = FORECAST_METRICS[day.dow];
+                        const hStat = HORIZON_METRICS[horizonIdx] || dStat;
+
+                        const metrics = {
+                            precision: (dStat.precision + hStat.precision) / 2,
+                            recall: (dStat.recall + hStat.recall) / 2,
+                            f1: (dStat.f1 + hStat.f1) / 2
+                        };
 
                         const getMetricClass = (val: number, threshold: number) => {
                             if (val === 0) return 'zero';
@@ -488,7 +533,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                                     </div>
                                     <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
                                     <div class="sparkline-container">
-                                        {this.renderSparkline(day.probs, day.scheduledProbs, isToday ? currentX : null)}
+                                        {this.renderSparkline(day.probs, day.scheduledProbs, day.heatmapProbs, isToday ? currentX : null)}
                                     </div>
                                 </div>
                                 <div class="day-metrics" title={`Recall: ${(metrics.recall * 100).toFixed(0)}%, Precision: ${(metrics.precision * 100).toFixed(0)}%, F1: ${metrics.f1.toFixed(2)}`}>
