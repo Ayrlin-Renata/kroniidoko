@@ -6,6 +6,7 @@
   "homepage": "https://kroniidoko.ayrl.in/",
   "scripts": {
     "dev": "vite",
+    "sync-constants": "node script/sync_forecast_constants.js",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "predeploy": "npm run build && cp cname dist || copy cname dist",
