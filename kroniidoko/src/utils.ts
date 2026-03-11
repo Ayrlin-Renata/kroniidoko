@@ -134,9 +134,14 @@ async function fetchLiveAndUpcoming(): Promise<Video[]> {
     schedulePromise = (async () => {
         const client = await getClient();
         try {
-            // @ts-ignore - need to use includePlaceholder
-            const { data } = await client.httpClient.get(`/users/live?channels=${THEME_CACHE.CHANNEL_ID}&includePlaceholder=true`);
-            const videos = data.map((v: any) => new Video(v));
+            // @ts-ignore - private httpClient
+            const { data } = await (client as any).httpClient.get(`/users/live?channels=${THEME_CACHE.CHANNEL_ID}&includePlaceholder=true`);
+            const videos = data.map((v: any) => {
+                const video = new Video(v);
+                (video as any).type = v.type;
+                (video as any).placeholderType = v.placeholderType;
+                return video;
+            });
 
             videos.sort((a: Video, b: Video) => {
                 const dA = new Date(a.scheduledStart || a.availableAt || 0).getTime();
@@ -181,18 +186,21 @@ export async function getKrData() {
             krnext: false,
             krnexttitle: "",
             krnextdate: new Date(),
-            krnextid: ""
+            krnextid: "",
+            krnexttype: ""
         } as any;
     }
     return {
         live: isLive,
         krlastdate: krlastvideo?.actualEnd || krlastvideo?.availableAt || new Date(),
         krlasttitle: krlastvideo?.title || "",
-        krlastid: krlastvideo?.videoId,
+        krlastid: krlastvideo?.videoId || (krlastvideo as any)?.id || "",
+        krlasttype: (krlastvideo as any)?.type || (krlastvideo?.status === 'past' ? 'stream' : ""),
         krnext: true,
         krnexttitle: krnextvideo?.title || "",
         krnextdate: krnextvideo?.scheduledStart || krnextvideo?.availableAt,
-        krnextid: krnextvideo?.videoId
+        krnextid: krnextvideo?.videoId || (krnextvideo as any)?.id || "",
+        krnexttype: (krnextvideo as any)?.type || (krnextvideo?.status === 'live' ? 'stream' : "")
     }
 }
 

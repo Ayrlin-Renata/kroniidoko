@@ -12,14 +12,16 @@ type DParams = {
 type DState = {
     loading: Boolean,
     data: {
-        live: Boolean,
+        live: boolean,
         krlastdate: Date,
-        krlasttitle: String,
-        krlastid: String,
-        krnext: Boolean,
-        krnexttitle: String,
+        krlasttitle: string,
+        krlastid: string,
+        krlasttype: string,
+        krnext: boolean,
+        krnexttitle: string,
         krnextdate: Date,
-        krnextid: String
+        krnextid: string,
+        krnexttype: string
     },
     activeStream: any | null,
     tailX: number | null,
@@ -36,10 +38,12 @@ export default class Doko extends Component<DParams, DState> {
                 krlastdate: new Date(),
                 krlasttitle: "",
                 krlastid: "",
+                krlasttype: "",
                 krnext: false,
                 krnexttitle: "",
                 krnextdate: new Date(),
-                krnextid: ""
+                krnextid: "",
+                krnexttype: ""
             },
             activeStream: null,
             tailX: null,
@@ -58,17 +62,20 @@ export default class Doko extends Component<DParams, DState> {
                         krlastdate: res.krlastdate,
                         krlasttitle: res.krlasttitle,
                         krlastid: res.krlastid,
+                        krlasttype: res.krlasttype,
                         krnext: res.krnext,
                         krnexttitle: res.krnexttitle,
                         krnextdate: res.krnextdate,
-                        krnextid: res.krnextid
+                        krnextid: res.krnextid,
+                        krnexttype: res.krnexttype
                     }
                 }, () => {
                     if (this.state.data.krnext) {
                         const nextS = {
                             title: this.state.data.krnexttitle,
                             scheduledStart: this.state.data.krnextdate,
-                            id: this.state.data.krnextid
+                            id: this.state.data.krnextid,
+                            type: this.state.data.krnexttype
                         };
                         this.setState({ activeStream: nextS });
                     }
@@ -105,7 +112,13 @@ export default class Doko extends Component<DParams, DState> {
             return (
                 <>
                     <h2 class="serif">KRONII KOKO!!!</h2>
-                    <h3 class="serif"><a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a></h3>
+                    <h3 class="serif">
+                        {data.krnextid && data.krnextid !== 'undefined' && data.krnexttype !== 'placeholder' ? (
+                            <a href={"https://youtube.com/watch?v=" + data.krnextid}>{data.krnexttitle}</a>
+                        ) : (
+                            <span class="disabled-link">{data.krnexttitle}</span>
+                        )}
+                    </h3>
                     {showForecast && <Forecast onSelectStream={this.handleSelectStream} initialHistory={this.state.history} />}
                 </>
             );
@@ -129,7 +142,11 @@ export default class Doko extends Component<DParams, DState> {
                         </div>
                         {showForecast && data.krlasttitle && (
                             <h3 class="serif">
-                                AT <a href={"https://youtube.com/watch?v=" + data.krlastid}>{data.krlasttitle}</a>
+                                AT {data.krlastid && data.krlastid !== 'undefined' && data.krlasttype !== 'placeholder' ? (
+                                    <a href={"https://youtube.com/watch?v=" + data.krlastid}>{data.krlasttitle}</a>
+                                ) : (
+                                    <span class="disabled-link">{data.krlasttitle}</span>
+                                )}
                             </h3>
                         )}
                     </div>
@@ -140,7 +157,8 @@ export default class Doko extends Component<DParams, DState> {
                             (
                                 <StreamCard
                                     title={this.state.activeStream ? this.state.activeStream.title : data.krnexttitle}
-                                    id={this.state.activeStream ? this.state.activeStream.id : data.krnextid}
+                                    id={this.state.activeStream ? (this.state.activeStream.videoId || this.state.activeStream.id) : data.krnextid}
+                                    type={this.state.activeStream ? this.state.activeStream.type : data.krnexttype}
                                     dateStr={this.state.activeStream
                                         ? new Date(this.state.activeStream.scheduledStart || this.state.activeStream.availableAt).toLocaleString()
                                         : krnextdatetimestr}
