@@ -40,6 +40,12 @@ const TIMEZONES = (() => {
     return zones;
 })();
 
+const applyCalibration = (prob: number, dow: number): number => {
+    if (!CALIBRATION || !CALIBRATION.gatekeeper || CALIBRATION.gatekeeper.length !== 7) return prob;
+    const index = Math.min(100, Math.max(0, Math.round(prob * 100)));
+    return (CALIBRATION as any).gatekeeper[dow][index];
+};
+
 interface ForecastProps {
     onSelectStream?: (stream: any, tailX: number) => void;
     initialHistory?: any[] | null;
@@ -80,12 +86,6 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
     componentWillUnmount() {
         this.mounted = false;
-    }
-
-    applyCalibration(prob: number, calibMap: number[]) {
-        if (!calibMap || calibMap.length === 0) return prob;
-        const idx = Math.min(100, Math.max(0, Math.floor(prob * 100)));
-        return calibMap[idx];
     }
 
     updateView = async () => {
@@ -241,7 +241,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
 
                 const dow = (times[i].getUTCDay() + 6) % 7;
                 pg = Math.min(1.0, pg * DOW_PROBABILITY_SCALES[dow]);
-                const calibratedProb = this.applyCalibration(pg, CALIBRATION.gatekeeper || []);
+                const calibratedProb = applyCalibration(pg, dow);
 
                 streamProbs.push(calibratedProb);
             }
@@ -531,7 +531,7 @@ export default class Forecast extends Component<ForecastProps, ForecastState> {
                                             {isActive ? 'battery_charging_20' : 'drag_indicator'}
                                         </span>
                                     </div>
-                                    <span class="day-prob">{(day.maxProb * 100).toFixed(0)}%</span>
+                                    <span class="day-prob">{Math.max(applyCalibration(day.maxProb, day.dow) * 100, Math.max(...day.scheduledProbs.filter(p => !isNaN(p))) * 100).toFixed(0)}%</span>
                                     <div class="sparkline-container">
                                         {this.renderSparkline(day.probs, day.scheduledProbs, day.heatmapProbs, isToday ? currentX : null)}
                                     </div>
